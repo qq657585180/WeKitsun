@@ -3760,4 +3760,8 @@
     <string name="settings_page_transition_animation_title">页面过渡动画</string>
     <string name="settings_page_transition_animation_aosp">AOSP</string>
     <string name="settings_page_transition_animation_miuix">Miuix</string>
+    <string name="feature_ai_reply_name">AI回复</string>
+    <string name="feature_ai_reply_description">在消息长按菜单添加AI回复入口，点击后调用AI生成回复内容</string>
+    <string name="feature_group_chat_summary_name">群聊总结</string>
+    <string name="feature_group_chat_summary_description">在群聊消息长按菜单添加AI总结入口，点击后获取最近消息并生成群聊总结</string>
 </resources>

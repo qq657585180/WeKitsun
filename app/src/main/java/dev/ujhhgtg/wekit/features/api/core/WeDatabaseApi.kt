@@ -253,6 +253,16 @@ object WeDatabaseApi : ApiFeature(), IResolveDex {
             LIMIT $limit OFFSET $offset
         """.trimIndent()
 
+        /** 按时间范围获取消息 */
+        fun messagesInRange(wxid: String, startTime: Long, endTime: Long) = """
+            SELECT msgId, msgSvrId, talker, content, type, createTime, isSend
+            FROM message
+            WHERE talker='$wxid'
+              AND createTime >= $startTime
+              AND createTime < $endTime
+            ORDER BY createTime ASC
+        """.trimIndent()
+
         /**
          * 获取指定会话中特定发送者的消息
          * 支持群聊（通过 content 匹配对方，或通过 isSend 匹配自己）与单聊
@@ -663,6 +673,27 @@ object WeDatabaseApi : ApiFeature(), IResolveDex {
         if (convId.isEmpty()) return emptyList()
         val offset = (pageIndex - 1) * pageSize
         return executeQuery(SqlStatements.messages(convId, pageSize, offset)).map { row ->
+            WeMessage(
+                msgId = row.long("msgId"),
+                msgSvrId = row.long("msgSvrId"),
+                talker = row.str("talker"),
+                content = row.str("content"),
+                typeCode = row.int("type"),
+                createTime = row.long("createTime"),
+                isSend = row.int("isSend")
+            )
+        }
+    }
+
+    /**
+     * 获取指定时间范围内的【消息】（按时间升序）
+     * @param convId 会话 ID
+     * @param startTime 起始时间（毫秒时间戳，含）
+     * @param endTime 结束时间（毫秒时间戳，不含）
+     */
+    fun getMessagesInRange(convId: String, startTime: Long, endTime: Long): List<WeMessage> {
+        if (convId.isEmpty()) return emptyList()
+        return executeQuery(SqlStatements.messagesInRange(convId, startTime, endTime)).map { row ->
             WeMessage(
                 msgId = row.long("msgId"),
                 msgSvrId = row.long("msgSvrId"),

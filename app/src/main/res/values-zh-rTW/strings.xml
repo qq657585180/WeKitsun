@@ -3742,4 +3742,6 @@
     <string name="settings_page_transition_animation_title">頁面過渡動畫</string>
     <string name="settings_page_transition_animation_aosp">AOSP</string>
     <string name="settings_page_transition_animation_miuix">Miuix</string>
+    <string name="feature_ai_reply_name">AI回覆</string>
+    <string name="feature_ai_reply_description">在訊息長按選單新增AI回覆入口，點擊後呼叫AI生成回覆內容</string>
 </resources>
