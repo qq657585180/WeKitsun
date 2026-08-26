@@ -90,9 +90,9 @@ import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.features.api.agent.WeAgentService
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
+import dev.ujhhgtg.wekit.features.api.ui.WeChatInputBarMenuApi
 import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
 import dev.ujhhgtg.wekit.features.core.ClickableFeature
-import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.items.system.agent.WeAgentOverlayController
 import dev.ujhhgtg.wekit.preferences.WePrefs
@@ -136,13 +136,12 @@ private enum class ToolbarDisplayMode(
 }
 
 @SuppressLint("StaticFieldLeak")
-@Feature(
-    id = "聊天工具栏",
-    nameRes = "feature_chat_toolbar_name",
-    categoryIds = [FeatureCategoryIds.CHAT],
-    descriptionRes = "feature_chat_toolbar_description",
-)
 object ChatToolbar : ClickableFeature(), IResolveDex {
+
+    override val technicalId = "聊天工具栏"
+    override val nameRes = R.string.feature_chat_toolbar_name
+    override val categoryIds = listOf(FeatureCategoryIds.CHAT)
+    override val descriptionRes = R.string.feature_chat_toolbar_description
 
     private const val TAG = "ChatToolbar"
 
@@ -182,13 +181,6 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
                 "MicroMsg.AppPanel",
                 "onMeasure width: %d, heigth:%d, isMeasured:%b, gridWidth:%d, gridHeight:%d"
             )
-        }
-    }
-
-    private val methodAppGridGetView by dexMethod {
-        matcher {
-            usingStrings("MicroMsg.AppGrid", "pos:", "page:")
-            name = "getView"
         }
     }
 
@@ -505,7 +497,7 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
             }
         }
 
-        methodAppGridGetView.hookAfter {
+        WeChatInputBarMenuApi.methodAppGridGetView.hookAfter {
             val itemView = result as View
             captureAppGridToolType(thisObject!!, itemView)
         }

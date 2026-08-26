@@ -74,8 +74,9 @@ import dev.ujhhgtg.wekit.i18n.LocalWeKitLocalizedContext
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexClass
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
+import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
+import dev.ujhhgtg.wekit.features.api.ui.WeChatInputBarMenuApi
 import dev.ujhhgtg.wekit.features.core.ClickableFeature
-import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.items.beautify.Themes.THEMES_PATH
 import dev.ujhhgtg.wekit.preferences.WePrefs.Companion.prefOption
@@ -117,13 +118,12 @@ import kotlin.math.roundToInt
  */
 @Suppress("DEPRECATION")
 @SuppressLint("DiscouragedApi", "InternalInsetResource")
-@Feature(
-    id = "主题",
-    nameRes = "feature_themes_name",
-    categoryIds = [FeatureCategoryIds.BEAUTIFY],
-    descriptionRes = "feature_themes_description",
-)
 object Themes : ClickableFeature(), IResolveDex {
+
+    override val technicalId = "主题"
+    override val nameRes = R.string.feature_themes_name
+    override val categoryIds = listOf(FeatureCategoryIds.BEAUTIFY)
+    override val descriptionRes = R.string.feature_themes_description
 
     private const val TAG = "Themes"
 
@@ -1363,19 +1363,6 @@ object Themes : ClickableFeature(), IResolveDex {
         }
     }
 
-    private val methodChattingDataAdapterV3OnBindViewHolder by dexMethod {
-        matcher {
-            usingStrings("MicroMsg.ChattingDataAdapterV3", "_onBindViewHolder[")
-        }
-    }
-
-    private val methodAppGridGetView by dexMethod {
-        matcher {
-            usingStrings("MicroMsg.AppGrid", "pos:", "page:")
-            name = "getView"
-        }
-    }
-
     private val methodHistoryMsgTongueShow1 by dexMethod {
         matcher {
             usingEqStrings("MicroMsg.HistoryMsgTongueComponent", "[update] mGoBackToHistoryMsgLayout VISIBLE")
@@ -1774,7 +1761,7 @@ object Themes : ClickableFeature(), IResolveDex {
         }
 
         // C0838j 22 —— ChattingDataAdapterV3.onBindViewHolder
-        methodChattingDataAdapterV3OnBindViewHolder.hookAfter {
+        WeMessageApi.methodChattingDataAdapterOnBindViewHolder.hookAfter {
             val holderView = args.getOrNull(0) ?: return@hookAfter
             val position = args.getOrNull(1) as? Int ?: return@hookAfter
             applyChatBubbleTheme(holderView, position, thisObject)
@@ -1977,7 +1964,7 @@ object Themes : ClickableFeature(), IResolveDex {
             }
 
         // C0838j 29 —— 聊天「+」面板
-        methodAppGridGetView.hookAfter {
+        WeChatInputBarMenuApi.methodAppGridGetView.hookAfter {
             val view = result as? View ?: return@hookAfter
             for ((resName, drawableName) in CHAT_PLUS_ICONS) {
                 val imageView = findImageViewByResTag(view as? ViewGroup, resName) ?: continue

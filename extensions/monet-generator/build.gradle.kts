@@ -31,6 +31,13 @@ configure<LibraryExtension> {
         sourceCompatibility = JavaVersion.toVersion(libs.versions.jdk.get().toInt())
         targetCompatibility = JavaVersion.toVersion(libs.versions.jdk.get().toInt())
     }
+
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+            it.maxHeapSize = "4g"
+        }
+    }
 }
 
 val r8Tool = configurations.detachedConfiguration(
@@ -79,4 +86,7 @@ dependencies {
     implementation(libs.bouncycastle.prov)
     implementation(libs.bouncycastle.pkix)
     implementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.junit.jupiter)
+    testImplementation(project(":libs:monet-generator-api"))
+    testRuntimeOnly(libs.junit.platform.launcher)
 }

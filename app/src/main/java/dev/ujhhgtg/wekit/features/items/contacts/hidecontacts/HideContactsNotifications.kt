@@ -1,11 +1,12 @@
 package dev.ujhhgtg.wekit.features.items.contacts.hidecontacts
 
+import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.features.core.ApiFeature
-import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.items.contacts.HideContacts
+import dev.ujhhgtg.wekit.features.items.notifications.NotificationsEvolved
 import dev.ujhhgtg.wekit.preferences.WePrefs
 import dev.ujhhgtg.wekit.utils.TargetProcesses
 import dev.ujhhgtg.wekit.utils.WeLogger
@@ -50,13 +51,12 @@ import dev.ujhhgtg.wekit.utils.WeLogger
  * hidden contact's chats and contact rows reappear, but their **notifications stay suppressed**.
  * Turn 隐藏联系人 off entirely to get notifications back.
  */
-@Feature(
-    id = "隐藏联系人通知抑制",
-    nameRes = "feature_hide_contacts_notifications_name",
-    categoryIds = [FeatureCategoryIds.API],
-    descriptionRes = "feature_hide_contacts_notifications_description",
-)
 object HideContactsNotifications : ApiFeature(), IResolveDex {
+
+    override val technicalId = "隐藏联系人通知抑制"
+    override val nameRes = R.string.feature_hide_contacts_notifications_name
+    override val categoryIds = listOf(FeatureCategoryIds.API)
+    override val descriptionRes = R.string.feature_hide_contacts_notifications_description
 
     private const val TAG = "HideContactsNotifications"
 
@@ -78,14 +78,6 @@ object HideContactsNotifications : ApiFeature(), IResolveDex {
      * ever 0-hits, that feature would already surface the dex-repair dialog, so adding
      * `allowFailure` here would buy nothing.
      */
-    private val methodDealNotify by dexMethod {
-        searchPackages("com.tencent.mm.booter.notification")
-        matcher {
-            paramCount(6)
-            usingEqStrings("jacks dealNotify, talker:%s, msgtype:%d, tipsFlag:%d, isRevokeMesasge:%B content:%s")
-        }
-    }
-
     /**
      * `com.tencent.mm.booter.notification.e0.f(long msgId, String userName, String nickName,
      * String content, String avatarPath, Map msgSource, j4 cmd)` — the LightPush notification
@@ -155,7 +147,7 @@ object HideContactsNotifications : ApiFeature(), IResolveDex {
         // switch, which would make turning 隐藏联系人 on require a WeChat restart to suppress
         // notifications.
 
-        methodDealNotify.hookBefore(100) {
+        NotificationsEvolved.methodDealNotify.hookBefore(100) {
             val talker = args[1] as? String ?: return@hookBefore
             if (!isSuppressed(talker)) return@hookBefore
             WeLogger.i(TAG, "suppressing message notification from $talker")

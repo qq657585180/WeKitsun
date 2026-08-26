@@ -7,13 +7,10 @@ import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.activity.PickRootTelegramStickerSetsContract
 import dev.ujhhgtg.wekit.activity.RootTelegramStickerSetsResult
 import dev.ujhhgtg.wekit.activity.TransparentActivity
-import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
-import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.WeServiceApi
 import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
-import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.core.SwitchFeature
 import dev.ujhhgtg.wekit.features.items.chat.panel.PanelPaths
@@ -64,21 +61,13 @@ import kotlin.io.path.readBytes
 import kotlin.io.path.writeBytes
 import kotlin.time.Duration.Companion.minutes
 
-@Feature(
-    id = "表情面板",
-    nameRes = "feature_sticker_panel_name",
-    categoryIds = [FeatureCategoryIds.CHAT],
-    descriptionRes = "feature_sticker_panel_description",
-)
-object StickerPanel : SwitchFeature(), IResolveDex { // entry implementation in ChatFooterHooks
+// Entry implementation in ChatFooterHooks.
+object StickerPanel : SwitchFeature() {
 
-    private val methodLoadEmojiFile by dexMethod {
-        matcher {
-            usingEqStrings("MicroMsg.EmojiLoader", "load emoji file ")
-            paramTypes("com.tencent.mm.storage.emotion.EmojiInfo", "boolean", null)
-        }
-    }
-
+    override val technicalId = "表情面板"
+    override val nameRes = R.string.feature_sticker_panel_name
+    override val categoryIds = listOf(FeatureCategoryIds.CHAT)
+    override val descriptionRes = R.string.feature_sticker_panel_description
     fun openPanel(anchor: View) {
         showStickerPanelSheet(
             context = anchor.context,
@@ -535,7 +524,7 @@ object StickerPanel : SwitchFeature(), IResolveDex { // entry implementation in 
     private suspend fun cacheWeChatSticker(md5: String): Boolean =
         withTimeoutOrNull(WECHAT_EMOJI_CACHE_TIMEOUT) {
             suspendCancellableCoroutine { continuation ->
-                val loadMethod = methodLoadEmojiFile.method
+                val loadMethod = WeMessageApi.methodLoadEmojiFile.method
                 val callbackType = loadMethod.parameterTypes[2]
                 val callback = Proxy.newProxyInstance(
                     callbackType.classLoader,

@@ -2,10 +2,9 @@ package dev.ujhhgtg.wekit.features.items.miniapps
 
 import dev.ujhhgtg.reflekt.reflekt
 import dev.ujhhgtg.reflekt.utils.toClass
+import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
-import dev.ujhhgtg.wekit.dexkit.dsl.dexConstructor
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
-import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.core.SwitchFeature
 import dev.ujhhgtg.wekit.utils.HostInfo
@@ -45,13 +44,12 @@ import java.util.concurrent.atomic.AtomicLong
  *   - .mb=new / .mbId -> MB 通道实例字段存在性。
  * 任一核心结构缺失时明确打 WeLogger.w 报告, 不注入半成品补丁。
  */
-@Feature(
-    id = "跳过激励广告",
-    nameRes = "feature_skip_rewarded_ads_name",
-    categoryIds = [FeatureCategoryIds.MINIAPPS],
-    descriptionRes = "feature_skip_rewarded_ads_description",
-)
 object SkipRewardedAds : SwitchFeature(), IResolveDex {
+
+    override val technicalId = "跳过激励广告"
+    override val nameRes = R.string.feature_skip_rewarded_ads_name
+    override val categoryIds = listOf(FeatureCategoryIds.MINIAPPS)
+    override val descriptionRes = R.string.feature_skip_rewarded_ads_description
 
     private const val TAG = "SkipRewardedAds"
     private const val SESSION_WINDOW_MS = 30_000L
@@ -77,14 +75,6 @@ object SkipRewardedAds : SwitchFeature(), IResolveDex {
 
     // 广告数据请求日志: 打印 webapi_getadvert 的请求内容 (主进程)。
     // 能看到奖励广告数据放行、发奖关键请求 VerifyAdRewardEligibility。
-    private val ctorNetSceneJSOperateWxData by dexConstructor {
-        matcher {
-            declaredClass {
-                usingEqStrings("MicroMsg.NetSceneJSOperateWxData", "doScene hash=%d, funcid=%d")
-            }
-        }
-    }
-
     // 真正的 SDK 注入点: loadLibFiles 读到的脚本文本在这里被编译/求值。
     // e3.h(f9, jsruntime.t, path, name, version, ctxId, script, i3, b3)
     private val methodInjectLibScript by dexMethod {
@@ -130,7 +120,7 @@ object SkipRewardedAds : SwitchFeature(), IResolveDex {
 
     override fun onEnable() {
         // 1) webapi_getadvert 请求日志 (主进程): 奖励请求放行 + 发奖校验。
-        ctorNetSceneJSOperateWxData.hookBefore {
+        RemoveEmbeddedAds.ctorNetSceneJSOperateWxData.hookBefore {
             val dataIndex = args.indexOfFirst { arg ->
                 arg is String && runCatching {
                     JSONObject(arg).optString("api_name") == "webapi_getadvert"

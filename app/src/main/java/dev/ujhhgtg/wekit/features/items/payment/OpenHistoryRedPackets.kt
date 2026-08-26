@@ -22,18 +22,14 @@ import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import dev.ujhhgtg.reflekt.utils.createInstance
 import dev.ujhhgtg.wekit.R
-import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
-import dev.ujhhgtg.wekit.dexkit.dsl.data
-import dev.ujhhgtg.wekit.dexkit.dsl.dexClass
-import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
+import dev.ujhhgtg.wekit.features.api.core.WePaymentApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageType
 import dev.ujhhgtg.wekit.features.api.core.models.WeMessage
 import dev.ujhhgtg.wekit.features.api.net.WeNetSceneApi
 import dev.ujhhgtg.wekit.features.api.ui.WeContactPrefsScreenApi
 import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
 import dev.ujhhgtg.wekit.features.core.ClickableFeature
-import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
 import dev.ujhhgtg.wekit.ui.content.Button
@@ -52,54 +48,18 @@ import kotlin.concurrent.thread
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.time.Duration.Companion.milliseconds
 
-@Feature(
-    id = "捡漏历史红包",
-    nameRes = "feature_open_history_red_packets_name",
-    categoryIds = [FeatureCategoryIds.PAYMENT],
-    descriptionRes = "feature_open_history_red_packets_description",
-)
-object OpenHistoryRedPackets : ClickableFeature(), WeContactPrefsScreenApi.IContactInfoProvider, IResolveDex {
+object OpenHistoryRedPackets : ClickableFeature(), WeContactPrefsScreenApi.IContactInfoProvider {
+
+    override val technicalId = "捡漏历史红包"
+    override val nameRes = R.string.feature_open_history_red_packets_name
+    override val categoryIds = listOf(FeatureCategoryIds.PAYMENT)
+    override val descriptionRes = R.string.feature_open_history_red_packets_description
 
     private const val TAG = "OpenHistoryRedPackets"
     private const val PREF_KEY = "open_history_red_packets"
 
     // 微信红包超过 24 小时即过期, 扫描更早的消息没有意义
     private const val RED_PACKET_EXPIRY_MILLIS = 24L * 60 * 60 * 1000
-
-    private val classReceiveLuckyMoney by dexClass {
-        matcher {
-            methods {
-                add {
-                    name = "<init>"
-                    usingEqStrings("MicroMsg.NetSceneReceiveLuckyMoney")
-                }
-            }
-        }
-    }
-    private val classOpenLuckyMoney by dexClass {
-        matcher {
-            methods {
-                add {
-                    name = "<init>"
-                    usingEqStrings("MicroMsg.NetSceneOpenLuckyMoney")
-                }
-            }
-        }
-    }
-    private val methodReceiveOnGYNetEnd by dexMethod {
-        matcher {
-            declaredClass(classReceiveLuckyMoney.data.name)
-            name = "onGYNetEnd"
-            paramCount = 3
-        }
-    }
-    private val methodOpenOnGYNetEnd by dexMethod {
-        matcher {
-            declaredClass(classOpenLuckyMoney.data.name)
-            name = "onGYNetEnd"
-            paramCount = 3
-        }
-    }
 
     private var isRunning by mutableStateOf(false)
     private val logList = mutableStateListOf<HistoryLog>()
@@ -126,7 +86,7 @@ object OpenHistoryRedPackets : ClickableFeature(), WeContactPrefsScreenApi.ICont
     override fun onEnable() {
         WeContactPrefsScreenApi.addProvider(this)
 
-        methodReceiveOnGYNetEnd.hookAfter {
+        WePaymentApi.methodReceiveLuckyMoneyOnGYNetEnd.hookAfter {
             val json = args[2] as? JSONObject ?: return@hookAfter
             val sendId = json.optString("sendId")
             val timingIdentifier = json.optString("timingIdentifier")
@@ -137,7 +97,7 @@ object OpenHistoryRedPackets : ClickableFeature(), WeContactPrefsScreenApi.ICont
 
             thread(name = "OpenHistoryRedPacketThread") {
                 try {
-                    val openReq = classOpenLuckyMoney.clazz.createInstance(
+                    val openReq = WePaymentApi.classOpenLuckyMoney.clazz.createInstance(
                         info.msgType, info.channelId, info.sendId, info.nativeUrl,
                         info.headImg, info.nickName, info.talker,
                         "v1.0", timingIdentifier, ""
@@ -151,7 +111,7 @@ object OpenHistoryRedPackets : ClickableFeature(), WeContactPrefsScreenApi.ICont
             }
         }
 
-        methodOpenOnGYNetEnd.hookAfter {
+        WePaymentApi.methodOpenLuckyMoneyOnGYNetEnd.hookAfter {
             val json = args[2] as? JSONObject ?: return@hookAfter
 
             val sendId = json.optString("sendId")
@@ -315,7 +275,7 @@ object OpenHistoryRedPackets : ClickableFeature(), WeContactPrefsScreenApi.ICont
                 nickName = nickName
             )
 
-            val req = classReceiveLuckyMoney.clazz.createInstance(
+            val req = WePaymentApi.classReceiveLuckyMoney.clazz.createInstance(
                 msgType, channelId, sendId, nativeUrl, 1, "v1.0", msg.talker
             )
             WeNetSceneApi.sendNetScene(req)

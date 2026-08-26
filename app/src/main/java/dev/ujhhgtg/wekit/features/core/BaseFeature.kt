@@ -4,7 +4,6 @@ package dev.ujhhgtg.wekit.features.core
 
 import android.content.Context
 import androidx.annotation.StringRes
-import androidx.compose.runtime.Composable
 import dev.ujhhgtg.reflekt.reflected.BaseReflectedMethod
 import dev.ujhhgtg.reflekt.reflected.ReflectedConstructor
 import dev.ujhhgtg.reflekt.reflekt
@@ -23,19 +22,15 @@ import kotlin.reflect.KClass
 
 abstract class BaseFeature {
 
-    var technicalId: String = ""
-        internal set
+    abstract val technicalId: String
 
-    @StringRes
-    var nameRes: Int = 0
-        internal set
+    @get:StringRes
+    abstract val nameRes: Int
 
-    var categoryIds: List<String> = emptyList()
-        internal set
+    abstract val categoryIds: List<String>
 
-    @StringRes
-    var descriptionRes: Int? = null
-        internal set
+    @get:StringRes
+    open val descriptionRes: Int? = null
 
     val technicalPath: String
         get() = categoryIds.joinToString(",") + "/" + technicalId
@@ -84,13 +79,10 @@ abstract class BaseFeature {
 
     open fun onDisable() {}
 
-    @Composable
-    open fun Ui() {
-    }
-
     private val _dexDelegates = mutableListOf<BaseDexDelegate>()
     val dexDelegates: List<BaseDexDelegate> get() = _dexDelegates
     internal fun registerDexDelegate(d: BaseDexDelegate) {
+        d.owner = this
         _dexDelegates += d
     }
 

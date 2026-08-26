@@ -7,6 +7,9 @@ import dev.ujhhgtg.wekit.utils.WeLogger
 
 abstract class SwitchFeature : BaseFeature() {
 
+    /** Optional order override within each concrete settings category. Lower values appear first. */
+    open val displayOrder: Int? = null
+
     /**
      * Default state when the user has never toggled this feature.
      *
@@ -23,9 +26,12 @@ abstract class SwitchFeature : BaseFeature() {
     protected open val shouldEnableOnStartup: Boolean
         get() = _isEnabled
 
+    internal fun loadPersistedState() {
+        _isEnabled = WePrefs.getBoolOrDef(technicalId, defaultEnabled)
+    }
+
     final override fun startup() {
         if (!shouldLoadInCurrentProcess) return
-        _isEnabled = WePrefs.getBoolOrDef(technicalId, defaultEnabled)
         if (shouldEnableOnStartup) enable()
     }
 
