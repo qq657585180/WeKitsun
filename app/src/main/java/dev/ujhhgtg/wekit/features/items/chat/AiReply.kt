@@ -1,8 +1,8 @@
 package dev.ujhhgtg.wekit.features.items.chat
 
 import android.view.View
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -24,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,14 +37,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Auto_awesome
+import com.composables.icons.materialsymbols.outlined.Chat
 import com.composables.icons.materialsymbols.outlined.Close
-import dev.ujhhgtg.wekit.agent.data.WeAgentRepository
-import dev.ujhhgtg.wekit.agent.data.WeAgentSettings
+import com.composables.icons.materialsymbols.outlined.Settings
+import dev.ujhhgtg.wekit.agent.data.entity.ModelEntity
+import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderEntity
+import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderType
 import dev.ujhhgtg.wekit.agent.model.LlmMessage
 import dev.ujhhgtg.wekit.agent.model.LlmRole
 import dev.ujhhgtg.wekit.agent.model.LlmStreamEvent
@@ -52,12 +60,15 @@ import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.core.models.MessageType
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
-import dev.ujhhgtg.wekit.features.core.BaseFeature
 import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.core.SwitchFeature
+import dev.ujhhgtg.wekit.preferences.WePrefs
+import dev.ujhhgtg.wekit.ui.agent.settings.label
 import dev.ujhhgtg.wekit.ui.content.Button
 import dev.ujhhgtg.wekit.ui.content.TextButton
+import dev.ujhhgtg.wekit.ui.content.m3.DropDownMenuWidget
+import dev.ujhhgtg.wekit.ui.content.m3.DropdownOption
 import dev.ujhhgtg.wekit.ui.utils.VectorPathDrawable
 import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import dev.ujhhgtg.wekit.utils.android.showToast
@@ -93,6 +104,26 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         val description: String,
     )
 
+    /**
+     * AI 回复的独立模型配置，与 WeAgent 的模型数据库解耦，直接持久化到 MMKV。
+     */
+    private object ModelConfig {
+        var providerTypeName by WePrefs.prefOption(
+            "ai_reply_provider_type",
+            ModelProviderType.OPENAI_CHAT_COMPLETION.name,
+        )
+        var baseUrl by WePrefs.prefOption("ai_reply_base_url", "")
+        var apiKey by WePrefs.prefOption("ai_reply_api_key", "")
+        var modelId by WePrefs.prefOption("ai_reply_model_id", "")
+
+        fun providerType(): ModelProviderType =
+            runCatching { ModelProviderType.valueOf(providerTypeName) }
+                .getOrDefault(ModelProviderType.OPENAI_CHAT_COMPLETION)
+
+        fun isConfigured(): Boolean =
+            baseUrl.isNotBlank() && apiKey.isNotBlank() && modelId.isNotBlank()
+    }
+
     override fun onEnable() {
         WeChatMessageContextMenuApi.addProvider(this)
     }
@@ -104,7 +135,7 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
     override fun getMenuItems(): List<WeChatMessageContextMenuApi.MenuItem> = listOf(
         WeChatMessageContextMenuApi.MenuItem(
             id = AI_REPLY_MENU_ID,
-            text = "AI回复",
+            text = "智能回复",
             drawable = AiReplyIcon(),
             imageVector = MaterialSymbols.Outlined.Auto_awesome,
             isSupported = ::isSupportedMessage,
@@ -129,12 +160,47 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         }
     }
 
-    @OptIn(ExperimentalLayoutApi::class)
     @Composable
     private fun AiReplyDialog(
         messageContent: String,
         talker: String,
         onDismiss: () -> Unit,
+    ) {
+        val context = LocalContext.current
+
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth(0.92f),
+        ) {
+            AiReplyMainPanel(
+                messageContent = messageContent,
+                talker = talker,
+                onDismiss = onDismiss,
+                onOpenConfig = {
+                    showComposeDialog(context, directlyDismissable = false) {
+                        Surface(
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 6.dp,
+                            modifier = Modifier.fillMaxWidth(0.92f),
+                        ) {
+                            ModelConfigPanel(onBack = onDismiss)
+                        }
+                    }
+                },
+            )
+        }
+    }
+
+    @OptIn(ExperimentalLayoutApi::class)
+    @Composable
+    private fun AiReplyMainPanel(
+        messageContent: String,
+        talker: String,
+        onDismiss: () -> Unit,
+        onOpenConfig: () -> Unit,
     ) {
         var replies by remember { mutableStateOf<List<String>>(emptyList()) }
         var isLoading by remember { mutableStateOf(false) }
@@ -143,29 +209,69 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         var replyCount by remember { mutableIntStateOf(16) }
         var selectedTone by remember { mutableStateOf(tonePresets.first()) }
         var customPrompt by remember { mutableStateOf("") }
+        var selectedIndex by remember { mutableIntStateOf(-1) }
+        var editedText by remember { mutableStateOf("") }
         val scope = rememberCoroutineScope()
 
-        Surface(
-            shape = RoundedCornerShape(24.dp),
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp,
-            modifier = Modifier.fillMaxWidth(0.92f),
+        fun runGenerate() {
+            if (!ModelConfig.isConfigured()) {
+                errorMessage = "未配置 AI 模型，请先点击右上角设置"
+                onOpenConfig()
+                return
+            }
+            isLoading = true
+            errorMessage = null
+            scope.launch {
+                val result = generateReplies(
+                    messageContent, talker,
+                    contextCount, replyCount, selectedTone, customPrompt,
+                )
+                isLoading = false
+                result.fold(
+                    onSuccess = {
+                        replies = it
+                        selectedIndex = if (it.isEmpty()) -1 else 0
+                        editedText = it.firstOrNull() ?: ""
+                    },
+                    onFailure = { errorMessage = it.message ?: "未知错误" },
+                )
+            }
+        }
+
+        fun sendReply(reply: String) {
+            scope.launch {
+                val sent = WeMessageApi.sendText(talker, reply)
+                if (sent) {
+                    showToast("已发送")
+                    onDismiss()
+                } else {
+                    showToast("发送失败，请查看日志")
+                }
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState()),
         ) {
-            Column(
-                modifier = Modifier
-                    .padding(20.dp)
-                    .verticalScroll(rememberScrollState()),
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = "AI回复",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                    )
+                Text(
+                    text = "智能回复",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onOpenConfig) {
+                        Icon(
+                            imageVector = MaterialSymbols.Outlined.Settings,
+                            contentDescription = "AI 模型与接口配置",
+                        )
+                    }
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = MaterialSymbols.Outlined.Close,
@@ -173,245 +279,227 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
                         )
                     }
                 }
+            }
 
-                Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(12.dp))
 
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = messageContent,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(12.dp),
+                )
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+            SliderSettingRow(
+                title = "参考上下文",
+                value = contextCount,
+                valueRange = 0..100,
+                suffix = "条",
+                enabled = !isLoading,
+                onValueChange = { contextCount = it },
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            SliderSettingRow(
+                title = "生成备选数",
+                value = replyCount,
+                valueRange = 1..30,
+                suffix = "条",
+                enabled = !isLoading,
+                onValueChange = { replyCount = it },
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text = "快捷选择语气预设",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                tonePresets.forEach { preset ->
+                    FilterChip(
+                        selected = preset == selectedTone,
+                        onClick = { if (!isLoading) selectedTone = preset },
+                        label = {
+                            Text(
+                                preset.name,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ),
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = selectedTone.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            OutlinedTextField(
+                value = customPrompt,
+                onValueChange = { customPrompt = it },
+                enabled = !isLoading,
+                placeholder = {
+                    Text(
+                        "也可以手动输入你的特殊回复要求...",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodySmall,
+                minLines = 1,
+                maxLines = 3,
+            )
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+            errorMessage?.let { err ->
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.errorContainer,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = messageContent,
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = err,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(12.dp),
                     )
                 }
-
-                HorizontalDivider(Modifier.padding(vertical = 12.dp))
-
-                Text(
-                    text = "参考上下文",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(4.dp))
-                SliderRow(
-                    value = contextCount,
-                    options = listOf(0, 10, 20, 30, 50, 100),
-                    suffix = "条",
-                    enabled = !isLoading,
-                    onValueChange = { contextCount = it },
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                Text(
-                    text = "生成备选数",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(4.dp))
-                SliderRow(
-                    value = replyCount,
-                    options = listOf(1, 3, 5, 10, 16, 30),
-                    suffix = "条",
-                    enabled = !isLoading,
-                    onValueChange = { replyCount = it },
-                )
-
                 Spacer(Modifier.height(12.dp))
+            }
 
-                Text(
-                    text = "快捷选择语气预设",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(4.dp))
-
-                FlowRow(
+            if (isLoading) {
+                Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    tonePresets.forEach { preset ->
-                        FilterChip(
-                            selected = preset == selectedTone,
-                            onClick = { if (!isLoading) selectedTone = preset },
-                            label = {
-                                Text(
-                                    preset.name,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                            ),
-                        )
-                    }
+                    Spacer(Modifier.height(8.dp))
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        strokeWidth = 3.dp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = "AI 思考中...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
                 }
+            }
 
-                Spacer(Modifier.height(6.dp))
+            if (replies.isNotEmpty()) {
                 Text(
-                    text = selectedTone.description,
-                    style = MaterialTheme.typography.bodySmall,
+                    text = "回复内容",
+                    style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-
-                Spacer(Modifier.height(12.dp))
-
+                Spacer(Modifier.height(4.dp))
                 OutlinedTextField(
-                    value = customPrompt,
-                    onValueChange = { customPrompt = it },
+                    value = editedText,
+                    onValueChange = { editedText = it },
                     enabled = !isLoading,
-                    placeholder = {
-                        Text(
-                            "也可以手动输入你的特殊回复要求...",
-                            style = MaterialTheme.typography.bodySmall,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = MaterialSymbols.Outlined.Chat,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    textStyle = MaterialTheme.typography.bodySmall,
-                    minLines = 1,
-                    maxLines = 3,
+                    textStyle = MaterialTheme.typography.bodyMedium,
+                    minLines = 2,
+                    maxLines = 6,
                 )
+                Spacer(Modifier.height(12.dp))
 
-                HorizontalDivider(Modifier.padding(vertical = 12.dp))
-
-                errorMessage?.let { err ->
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            text = err,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(12.dp),
-                        )
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
-
-                if (isLoading) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Spacer(Modifier.height(8.dp))
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(32.dp),
-                            strokeWidth = 3.dp,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = "AI 思考中...",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                    }
-                }
-
-                if (replies.isNotEmpty()) {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        replies.forEach { reply ->
-                            Surface(
-                                shape = RoundedCornerShape(12.dp),
-                                color = MaterialTheme.colorScheme.surfaceVariant,
-                                modifier = Modifier.fillMaxWidth(),
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            scope.launch {
-                                                val sent = WeMessageApi.sendText(talker, reply)
-                                                if (sent) {
-                                                    showToast("已发送")
-                                                    onDismiss()
-                                                } else {
-                                                    showToast("发送失败，请查看日志")
-                                                }
-                                            }
-                                        }
-                                        .padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Text(
-                                        text = reply,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        modifier = Modifier.weight(1f),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(12.dp))
-                }
-
-                if (replies.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        TextButton(
-                            onClick = {
-                                replies = emptyList()
-                                errorMessage = null
-                                isLoading = true
-                                scope.launch {
-                                    val result = generateReplies(
-                                        messageContent, talker,
-                                        contextCount, replyCount, selectedTone, customPrompt,
-                                    )
-                                    isLoading = false
-                                    result.fold(
-                                        onSuccess = { replies = it },
-                                        onFailure = { errorMessage = it.message ?: "未知错误" },
-                                    )
-                                }
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    replies.forEachIndexed { index, reply ->
+                        val selected = index == selectedIndex
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceVariant
                             },
-                            enabled = !isLoading,
-                            modifier = Modifier.weight(1f),
+                            border = if (selected) {
+                                BorderStroke(1.dp, MaterialTheme.colorScheme.primary)
+                            } else {
+                                null
+                            },
+                            modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Text("不满意？换一批")
-                        }
-                        TextButton(
-                            onClick = onDismiss,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            Text("完成")
+                            Text(
+                                text = reply,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier
+                                    .clickable {
+                                        selectedIndex = index
+                                        editedText = reply
+                                    }
+                                    .padding(12.dp),
+                            )
                         }
                     }
-                } else {
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+
+            if (replies.isEmpty() && !isLoading) {
+                Button(
+                    onClick = { runGenerate() },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("生成智能回复")
+                }
+            } else if (replies.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Button(
-                        onClick = {
-                            isLoading = true
-                            errorMessage = null
-                            scope.launch {
-                                val result = generateReplies(
-                                    messageContent, talker,
-                                    contextCount, replyCount, selectedTone, customPrompt,
-                                )
-                                isLoading = false
-                                result.fold(
-                                    onSuccess = { replies = it },
-                                    onFailure = { errorMessage = it.message ?: "未知错误" },
-                                )
-                            }
-                        },
+                        onClick = { runGenerate() },
                         enabled = !isLoading,
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.weight(1f),
                     ) {
-                        Text("生成智能回复")
+                        Text("不满意？换一批")
+                    }
+                    TextButton(
+                        onClick = { sendReply(editedText.trim()) },
+                        enabled = !isLoading && editedText.isNotBlank(),
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text("完成")
                     }
                 }
             }
@@ -419,35 +507,200 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
     }
 
     @Composable
-    private fun SliderRow(
+    private fun SliderSettingRow(
+        title: String,
         value: Int,
-        options: List<Int>,
+        valueRange: IntRange,
         suffix: String,
         enabled: Boolean,
         onValueChange: (Int) -> Unit,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            options.forEach { option ->
-                FilterChip(
-                    selected = option == value,
-                    onClick = { onValueChange(option) },
-                    enabled = enabled,
-                    label = {
-                        Text(
-                            "$option$suffix",
-                            style = MaterialTheme.typography.labelSmall,
-                        )
-                    },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    ),
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = "$value$suffix",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        Slider(
+            value = value.toFloat(),
+            onValueChange = { onValueChange(it.toInt()) },
+            enabled = enabled,
+            valueRange = valueRange.first.toFloat()..valueRange.last.toFloat(),
+        )
+    }
+
+    @Composable
+    private fun ModelConfigPanel(onBack: () -> Unit) {
+        val scope = rememberCoroutineScope()
+        val remoteTypes = REMOTE_PROVIDER_TYPES
+        var selectedType by remember { mutableStateOf(ModelConfig.providerType()) }
+        var baseUrl by remember { mutableStateOf(ModelConfig.baseUrl) }
+        var apiKey by remember { mutableStateOf(ModelConfig.apiKey) }
+        var modelId by remember { mutableStateOf(ModelConfig.modelId) }
+        var testing by remember { mutableStateOf(false) }
+
+        fun runTestConnection() {
+            val url = baseUrl.trim()
+            val key = apiKey.trim()
+            if (url.isBlank()) {
+                showToast("请先填写 API 地址")
+                return
+            }
+            if (key.isBlank()) {
+                showToast("请先填写 API Key")
+                return
+            }
+            testing = true
+            scope.launch {
+                val provider = ModelProviderEntity(
+                    id = "ai_reply",
+                    type = selectedType,
+                    name = "AI回复",
+                    baseUrl = url,
+                    apiKey = key,
                 )
+                val result = ModelProviderManager.listRemoteModels(provider)
+                testing = false
+                result.fold(
+                    onSuccess = { models ->
+                        if (models.isEmpty()) {
+                            showToast("连接成功，但未获取到可用模型")
+                        } else {
+                            showToast("连接成功，获取到 ${models.size} 个模型")
+                        }
+                    },
+                    onFailure = { showToast("连接失败：${it.message}") },
+                )
+            }
+        }
+
+        Column(
+            modifier = Modifier
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "AI 模型与接口配置",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = MaterialSymbols.Outlined.Close,
+                        contentDescription = "返回",
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
+            DropDownMenuWidget(
+                icon = null,
+                iconPlaceholder = false,
+                title = "接口类型",
+                description = null,
+                value = selectedType,
+                options = remoteTypes.map { DropdownOption(it, it.label()) },
+                onValueChange = { selectedType = it },
+            )
+
+            OutlinedTextField(
+                value = baseUrl,
+                onValueChange = { baseUrl = it },
+                label = { Text("API 地址 (Base URL)") },
+                placeholder = {
+                    Text(
+                        "https://api.openai.com/v1",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyMedium,
+                singleLine = true,
+            )
+
+            OutlinedTextField(
+                value = apiKey,
+                onValueChange = { apiKey = it },
+                label = { Text("API Key") },
+                placeholder = {
+                    Text(
+                        "sk-...",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyMedium,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                visualTransformation = PasswordVisualTransformation(),
+            )
+
+            Button(
+                onClick = { runTestConnection() },
+                enabled = !testing,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                if (testing) {
+                    Text("正在测试连接...")
+                } else {
+                    Text("测试连接")
+                }
+            }
+
+            OutlinedTextField(
+                value = modelId,
+                onValueChange = { modelId = it },
+                label = { Text("模型 ID") },
+                placeholder = {
+                    Text(
+                        "gpt-4o-mini",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                },
+                modifier = Modifier.fillMaxWidth(),
+                textStyle = MaterialTheme.typography.bodyMedium,
+                singleLine = true,
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TextButton(
+                    onClick = onBack,
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("取消")
+                }
+                Button(
+                    onClick = {
+                        ModelConfig.providerTypeName = selectedType.name
+                        ModelConfig.baseUrl = baseUrl.trim()
+                        ModelConfig.apiKey = apiKey.trim()
+                        ModelConfig.modelId = modelId.trim()
+                        onBack()
+                    },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Text("保存")
+                }
             }
         }
     }
@@ -461,16 +714,25 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         customPrompt: String,
     ): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
-            val modelId = WeAgentSettings.defaultModelId()
-                ?: WeAgentRepository.firstModelId()
-                ?: throw IllegalStateException("未配置AI模型，请先在WeAgent设置中添加模型")
+            check(ModelConfig.baseUrl.isNotBlank()) { "未配置 API 地址，请先点击右上角设置" }
+            check(ModelConfig.apiKey.isNotBlank()) { "未配置 API Key，请先点击右上角设置" }
+            check(ModelConfig.modelId.isNotBlank()) { "未配置模型 ID，请先点击右上角设置" }
 
-            val model = WeAgentRepository.getModel(modelId)
-                ?: throw IllegalStateException("未找到模型: $modelId")
-
-            val provider = WeAgentRepository.getModelProvider(model.providerId)
-                ?: throw IllegalStateException("未找到模型提供者: ${model.providerId}")
-
+            val provider = ModelProviderEntity(
+                id = "ai_reply",
+                type = ModelConfig.providerType(),
+                name = "AI回复",
+                baseUrl = ModelConfig.baseUrl.trim(),
+                apiKey = ModelConfig.apiKey.trim(),
+            )
+            val model = ModelEntity(
+                id = "ai_reply_model",
+                providerId = provider.id,
+                modelIdRemote = ModelConfig.modelId.trim(),
+                reasoningEffort = null,
+                customJsonOverride = null,
+                displayName = ModelConfig.modelId.trim(),
+            )
             val client = ModelProviderManager.clientFor(provider)
 
             val contextText = if (contextCount > 0) {
@@ -553,6 +815,11 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         if (numberedReplies.isNotEmpty()) return numberedReplies
 
         return text.lines().map { it.trim() }.filter { it.isNotBlank() }
+    }
+
+    private companion object {
+        val REMOTE_PROVIDER_TYPES =
+            ModelProviderType.entries.filterNot { it == ModelProviderType.LOCAL_LLAMA }
     }
 }
 
