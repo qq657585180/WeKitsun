@@ -102,26 +102,6 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         val description: String,
     )
 
-    /**
-     * AI 回复的独立模型配置，与 WeAgent 的模型数据库解耦，直接持久化到 MMKV。
-     */
-    private object ModelConfig {
-        var providerTypeName by WePrefs.prefOption(
-            "ai_reply_provider_type",
-            ModelProviderType.OPENAI_CHAT_COMPLETION.name,
-        )
-        var baseUrl by WePrefs.prefOption("ai_reply_base_url", "")
-        var apiKey by WePrefs.prefOption("ai_reply_api_key", "")
-        var modelId by WePrefs.prefOption("ai_reply_model_id", "")
-
-        fun providerType(): ModelProviderType =
-            runCatching { ModelProviderType.valueOf(providerTypeName) }
-                .getOrDefault(ModelProviderType.OPENAI_CHAT_COMPLETION)
-
-        fun isConfigured(): Boolean =
-            baseUrl.isNotBlank() && apiKey.isNotBlank() && modelId.isNotBlank()
-    }
-
     override fun onEnable() {
         WeChatMessageContextMenuApi.addProvider(this)
     }
@@ -206,7 +186,7 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         val scope = rememberCoroutineScope()
 
         fun runGenerate() {
-            if (!ModelConfig.isConfigured()) {
+            if (!AiModelConfig.isConfigured()) {
                 errorMessage = "未配置 AI 模型，请先点击右上角设置"
                 onOpenConfig()
                 return
@@ -535,10 +515,10 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
     private fun ModelConfigPanel(onBack: () -> Unit) {
         val scope = rememberCoroutineScope()
         val remoteTypes = REMOTE_PROVIDER_TYPES
-        var selectedType by remember { mutableStateOf(ModelConfig.providerType()) }
-        var baseUrl by remember { mutableStateOf(ModelConfig.baseUrl) }
-        var apiKey by remember { mutableStateOf(ModelConfig.apiKey) }
-        var modelId by remember { mutableStateOf(ModelConfig.modelId) }
+        var selectedType by remember { mutableStateOf(AiModelConfig.providerType()) }
+        var baseUrl by remember { mutableStateOf(AiModelConfig.baseUrl) }
+        var apiKey by remember { mutableStateOf(AiModelConfig.apiKey) }
+        var modelId by remember { mutableStateOf(AiModelConfig.modelId) }
         var testing by remember { mutableStateOf(false) }
 
         fun runTestConnection() {
@@ -683,10 +663,10 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
                 }
                 Button(
                     onClick = {
-                        ModelConfig.providerTypeName = selectedType.name
-                        ModelConfig.baseUrl = baseUrl.trim()
-                        ModelConfig.apiKey = apiKey.trim()
-                        ModelConfig.modelId = modelId.trim()
+                        AiModelConfig.providerTypeName = selectedType.name
+                        AiModelConfig.baseUrl = baseUrl.trim()
+                        AiModelConfig.apiKey = apiKey.trim()
+                        AiModelConfig.modelId = modelId.trim()
                         onBack()
                     },
                     modifier = Modifier.weight(1f),
@@ -706,24 +686,24 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         customPrompt: String,
     ): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
-            check(ModelConfig.baseUrl.isNotBlank()) { "未配置 API 地址，请先点击右上角设置" }
-            check(ModelConfig.apiKey.isNotBlank()) { "未配置 API Key，请先点击右上角设置" }
-            check(ModelConfig.modelId.isNotBlank()) { "未配置模型 ID，请先点击右上角设置" }
+            check(AiModelConfig.baseUrl.isNotBlank()) { "未配置 API 地址，请先点击右上角设置" }
+            check(AiModelConfig.apiKey.isNotBlank()) { "未配置 API Key，请先点击右上角设置" }
+            check(AiModelConfig.modelId.isNotBlank()) { "未配置模型 ID，请先点击右上角设置" }
 
             val provider = ModelProviderEntity(
                 id = "ai_reply",
-                type = ModelConfig.providerType(),
+                type = AiModelConfig.providerType(),
                 name = "AI回复",
-                baseUrl = ModelConfig.baseUrl.trim(),
-                apiKey = ModelConfig.apiKey.trim(),
+                baseUrl = AiModelConfig.baseUrl.trim(),
+                apiKey = AiModelConfig.apiKey.trim(),
             )
             val model = ModelEntity(
                 id = "ai_reply_model",
                 providerId = provider.id,
-                modelIdRemote = ModelConfig.modelId.trim(),
+                modelIdRemote = AiModelConfig.modelId.trim(),
                 reasoningEffort = null,
                 customJsonOverride = null,
-                displayName = ModelConfig.modelId.trim(),
+                displayName = AiModelConfig.modelId.trim(),
             )
             val client = ModelProviderManager.clientFor(provider)
 

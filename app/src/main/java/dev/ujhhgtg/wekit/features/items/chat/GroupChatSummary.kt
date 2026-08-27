@@ -26,6 +26,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Auto_awesome
+import dev.ujhhgtg.wekit.agent.data.entity.ModelEntity
+import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderEntity
+import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderType
+import dev.ujhhgtg.wekit.agent.model.LlmMessage
+import dev.ujhhgtg.wekit.agent.model.LlmRole
+import dev.ujhhgtg.wekit.agent.model.LlmStreamEvent
+import dev.ujhhgtg.wekit.agent.model.ModelProviderManager
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
@@ -269,8 +276,104 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                 throw IllegalStateException("该群聊最近没有消息，无法生成统计报告")
             }
 
-            buildReport(messages, membersMap, talker)
+            val statsReport = buildReport(messages, membersMap, talker)
+
+            // 配置了 AI 模型时，用 AI 生成智能群聊分析；未配置或失败时回退到统计报告
+            if (AiModelConfig.isConfigured()) {
+                runCatching {
+                    aiGenerateReport(messages, membersMap, talker, statsReport)
+                }.getOrElse { statsReport }
+            } else {
+                statsReport
+            }
         }
+    }
+
+    private suspend fun aiGenerateReport(
+        messages: List<WeMessage>,
+        membersMap: Map<String, String>,
+        talker: String,
+        statsReport: String,
+    ): String {
+        check(AiModelConfig.baseUrl.isNotBlank()) { "未配置 API 地址" }
+        check(AiModelConfig.apiKey.isNotBlank()) { "未配置 API Key" }
+        check(AiModelConfig.modelId.isNotBlank()) { "未配置模型 ID" }
+
+        val provider = ModelProviderEntity(
+            id = "ai_reply",
+            type = AiModelConfig.providerType(),
+            name = "AI回复",
+            baseUrl = AiModelConfig.baseUrl.trim(),
+            apiKey = AiModelConfig.apiKey.trim(),
+        )
+        val model = ModelEntity(
+            id = "ai_reply_model",
+            providerId = provider.id,
+            modelIdRemote = AiModelConfig.modelId.trim(),
+            reasoningEffort = null,
+            customJsonOverride = null,
+            displayName = AiModelConfig.modelId.trim(),
+        )
+        val client = ModelProviderManager.clientFor(provider)
+
+        // 最近聊天片段（最多 30 条）
+        val recentLines = messages.takeLast(30).joinToString("\n") { msg ->
+            val sender = extractSenderId(msg, membersMap)
+            val text = extractTextContent(msg, membersMap)
+            "$sender: $text"
+        }
+
+        val systemPrompt = buildString {
+            append("你是一个微信群聊分析助手，擅长从群聊数据中提炼洞察。")
+            append("你会收到群聊的统计数据和最近聊天记录，请生成一份生动、有洞察的群聊分析报告。")
+            append("要求：用中文，结构清晰，包含群聊氛围总结、活跃成员点评、有趣观察，语气轻松幽默但不油腻。")
+        }
+
+        val userPrompt = buildString {
+            appendLine("群聊统计数据：")
+            appendLine(statsReport)
+            appendLine()
+            appendLine("最近聊天记录片段：")
+            appendLine(recentLines)
+            appendLine()
+            appendLine("请基于以上信息生成群聊分析报告。")
+        }
+
+        val messages2 = listOf(
+            LlmMessage(role = LlmRole.SYSTEM, content = systemPrompt),
+            LlmMessage(role = LlmRole.USER, content = userPrompt),
+        )
+
+        val request = ModelProviderManager.buildRequest(
+            model = model,
+            messages = messages2,
+            tools = emptyList(),
+            stream = true,
+        )
+
+        var reportContent = ""
+        client.stream(request).collect { event ->
+            when (event) {
+                is LlmStreamEvent.TextDelta -> {
+                    reportContent += event.text
+                }
+                is LlmStreamEvent.Completed -> {
+                    if (reportContent.isBlank()) {
+                        reportContent = event.message.content ?: ""
+                    }
+                }
+                is LlmStreamEvent.Failed -> {
+                    throw event.error
+                }
+                else -> {}
+            }
+        }
+
+        val trimmed = reportContent.trim()
+        if (trimmed.isBlank()) {
+            throw IllegalStateException("AI未生成有效的分析报告")
+        }
+        return trimmed
     }
 
     private fun buildReport(
