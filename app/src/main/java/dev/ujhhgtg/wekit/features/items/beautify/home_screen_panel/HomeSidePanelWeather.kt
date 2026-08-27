@@ -61,10 +61,10 @@ internal data class WeatherCity(
 
 internal val DEFAULT_WEATHER_CITY = WeatherCity(
     countryCode = "CN",
-    province = "北京",
-    city = "北京",
+    province = "湖北",
+    city = "武汉",
     district = null,
-    cityNum = "101010100",
+    cityNum = "101200101",
 )
 
 @Serializable
