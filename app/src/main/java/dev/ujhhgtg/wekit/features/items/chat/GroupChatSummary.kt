@@ -2,6 +2,9 @@ package dev.ujhhgtg.wekit.features.items.chat
 import dev.ujhhgtg.wekit.R
 
 import android.view.View
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -107,6 +110,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
         var isLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var messageCount by remember { mutableIntStateOf(500) }
+        var depth by remember { mutableStateOf(2) } // 0=快速 1=标准 2=深度 3=武汉口语
         val scope = rememberCoroutineScope()
 
         val groupName = remember(talker) {
@@ -114,7 +118,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
         }
 
         AlertDialogContent(
-            title = { Text("群聊统计报告") },
+            title = { Text(stringResource(R.string.ui_group_analyse_title)) },
             text = {
                 Column(
                     modifier = Modifier
@@ -129,6 +133,13 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
 
                     Spacer(Modifier.height(8.dp))
 
+                    // 分析上下文条数
+                    Text(
+                        text = stringResource(R.string.ui_group_analyse_context_count),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(2.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(onClick = { messageCount = 200 }, enabled = !isLoading) {
                             Text("200条", color = if (messageCount == 200) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
@@ -138,6 +149,39 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                         }
                         TextButton(onClick = { messageCount = 1000 }, enabled = !isLoading) {
                             Text("1000条", color = if (messageCount == 1000) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        }
+                    }
+                    Text(
+                        text = stringResource(R.string.ui_group_analyse_context_tip),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // 分析深度
+                    Text(
+                        text = stringResource(R.string.ui_group_analyse_deep),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(2.dp)) {
+                        val depthOptions = listOf(
+                            R.string.ui_group_fast,
+                            R.string.ui_group_normal,
+                            R.string.ui_group_deep,
+                        )
+                        depthOptions.forEachIndexed { index, res ->
+                            TextButton(
+                                onClick = { depth = index },
+                                enabled = !isLoading,
+                            ) {
+                                Text(
+                                    stringResource(res),
+                                    color = if (depth == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                )
+                            }
                         }
                     }
 
@@ -152,7 +196,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                                 modifier = Modifier.padding(end = 12.dp),
                                 strokeWidth = 3.dp,
                             )
-                            Text("正在生成统计报告...")
+                            Text("正在生成智能分析...")
                         }
                     }
 
@@ -169,11 +213,22 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
 
                     report?.let { result ->
                         Text(
+                            text = stringResource(R.string.ui_group_result),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+                        )
+                        Text(
                             text = result,
                             style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(12.dp),
+                                .padding(bottom = 4.dp),
+                        )
+                        Text(
+                            text = stringResource(R.string.ui_tip_ai_only),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                         )
                     }
                 }
@@ -193,7 +248,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                             }
                         },
                     ) {
-                        Text("发送到群聊")
+                        Text(stringResource(R.string.btn_reply))
                     }
                 } else {
                     Button(
@@ -201,7 +256,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                             isLoading = true
                             errorMessage = null
                             scope.launch {
-                                val result = generateReport(talker, messageCount)
+                                val result = generateReport(talker, messageCount, depth)
                                 isLoading = false
                                 result.fold(
                                     onSuccess = { report = it },
@@ -223,7 +278,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                                 errorMessage = null
                                 isLoading = true
                                 scope.launch {
-                                    val result = generateReport(talker, messageCount)
+                                    val result = generateReport(talker, messageCount, depth)
                                     isLoading = false
                                     result.fold(
                                         onSuccess = { report = it },
@@ -233,7 +288,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                             },
                             enabled = !isLoading,
                         ) {
-                            Text("重新统计")
+                            Text(stringResource(R.string.btn_re_analyse))
                         }
                         TextButton(
                             onClick = {
@@ -241,7 +296,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                                 showToast("已复制报告内容")
                             },
                         ) {
-                            Text("复制")
+                            Text(stringResource(R.string.btn_copy))
                         }
                     }
                 } else {
@@ -256,6 +311,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
     private suspend fun generateReport(
         talker: String,
         count: Int,
+        depth: Int = 2,
     ): Result<String> = withContext(Dispatchers.IO) {
         runCatching {
             val membersMap = WeDatabaseApi.getGroupMembers(talker).associate { m ->
@@ -278,15 +334,107 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
 
             val statsReport = buildReport(messages, membersMap, talker)
 
-            // 配置了 AI 模型时，用 AI 生成智能群聊分析；未配置或失败时回退到统计报告
+            // 配置了 AI 模型时，用 AI 生成智能群聊分析
             if (AiModelConfig.isConfigured()) {
-                runCatching {
-                    aiGenerateReport(messages, membersMap, talker, statsReport)
-                }.getOrElse { statsReport }
+                aiGenerateReport(messages, membersMap, talker, statsReport, depth)
             } else {
-                statsReport
+                throw IllegalStateException("未配置 AI 模型，请先点击右上角设置配置 API")
             }
         }
+    }
+
+    private fun buildAnalysisPrompt(depth: Int, statsReport: String, recentLines: String): Pair<String, String> {
+        val systemPrompt: String
+        val userPrompt: String
+
+        when (depth) {
+            0 -> {
+                // 群聊日报总结
+                systemPrompt = """你是微信群定时总结助手。
+读取最近一段群聊历史消息，生成一份简短群聊日报总结。
+输出内容分为：
+【今日话题】简要概括大家讨论了哪几件事
+【重要消息】提取通知、邀约、时间、活动、任务、求助等关键信息，无关闲聊省略
+【氛围小结】简单描述今天群内聊天氛围
+【闲聊亮点】有意思的段子、玩笑、梗（没有就写无）
+
+规则：
+1、文字精简，手机阅读友好，不要大段长篇
+2、没有重要消息如实写，不要凭空编造内容
+3、输出不带复杂markdown符号
+4、语气自然口语化，适合直接发到群内"""
+                userPrompt = buildString {
+                    appendLine("群聊统计数据：")
+                    appendLine(statsReport)
+                    appendLine()
+                    appendLine("最近聊天记录片段：")
+                    appendLine(recentLines)
+                    appendLine()
+                    appendLine("请生成日报总结。")
+                }
+            }
+            1 -> {
+                // 话题热度统计分析
+                systemPrompt = """你是群聊话题热度统计分析助手。
+基于提供的群聊历史聊天记录，完成热度统计分析。
+输出结构：
+【热门话题排行】
+按讨论热度从高到低列出前3-5个话题，简单说明该话题大家讨论的内容。
+
+【热度说明】
+高热度：多人连续发言、来回讨论
+中等热度：少数几个人闲聊
+低热度：只有一句话、没人接话
+
+【活跃人员】
+列出本次聊天里面发言比较多、参与讨论较多的人，不需要主观评价，只做客观统计。
+
+【风险提醒】
+识别是否存在争吵、吐槽、纠纷、敏感言论、广告引流，没有则填无。
+
+输出约束：
+1、输出简洁，拒绝大段文字，适配手机弹窗查看。
+2、不编造聊天记录不存在的事件。
+3、不要复杂Markdown格式，排版干净。
+4、结果客观，只做热度统计，不做价值评判。"""
+                userPrompt = buildString {
+                    appendLine("群聊统计数据：")
+                    appendLine(statsReport)
+                    appendLine()
+                    appendLine("最近聊天记录片段：")
+                    appendLine(recentLines)
+                    appendLine()
+                    appendLine("请进行话题热度统计分析。")
+                }
+            }
+            else -> {
+                // 深度分析：群聊分析引擎 5 模块
+                systemPrompt = """你为微信群聊分析引擎，深度解析群聊天上下文内容
+输出分为5个模块
+【话题总结】梳理本轮群聊完整主题，提炼关键事件、人物、诉求。
+【情绪&氛围评估】判断整体氛围：欢乐、调侃、抱怨、焦虑、正式工作、客套寒暄、争吵。标注是否有话题冲突、阴阳、尴尬冷场。
+【关键信息提取】提取时间、事件、邀约、通知、任务、求助、活动、聚餐、生日、工作安排等关键有效信息。无关闲聊废话过滤。
+【人物倾向】简要说明每个人发言的立场、态度。（不需要过度揣测隐私）
+【回复方案】提供4套回复思路：高情商稳妥版｜轻松幽默版｜简短附和版｜理性客观版。
+
+硬性约束：
+1.禁止脑补编造聊天不存在的信息。
+2.分析结果分条清晰，便于阅读。
+3.当聊天信息不足时如实说明，不强行分析。
+4.输出结果不使用Markdown复杂格式，适配手机弹窗阅读。"""
+                userPrompt = buildString {
+                    appendLine("群聊统计数据：")
+                    appendLine(statsReport)
+                    appendLine()
+                    appendLine("最近聊天记录片段：")
+                    appendLine(recentLines)
+                    appendLine()
+                    appendLine("请进行深度分析。")
+                }
+            }
+        }
+
+        return Pair(systemPrompt, userPrompt)
     }
 
     private suspend fun aiGenerateReport(
@@ -294,6 +442,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
         membersMap: Map<String, String>,
         talker: String,
         statsReport: String,
+        depth: Int = 2,
     ): String {
         check(AiModelConfig.baseUrl.isNotBlank()) { "未配置 API 地址" }
         check(AiModelConfig.apiKey.isNotBlank()) { "未配置 API Key" }
@@ -323,21 +472,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
             "$sender: $text"
         }
 
-        val systemPrompt = buildString {
-            append("你是一个微信群聊分析助手，擅长从群聊数据中提炼洞察。")
-            append("你会收到群聊的统计数据和最近聊天记录，请生成一份生动、有洞察的群聊分析报告。")
-            append("要求：用中文，结构清晰，包含群聊氛围总结、活跃成员点评、有趣观察，语气轻松幽默但不油腻。")
-        }
-
-        val userPrompt = buildString {
-            appendLine("群聊统计数据：")
-            appendLine(statsReport)
-            appendLine()
-            appendLine("最近聊天记录片段：")
-            appendLine(recentLines)
-            appendLine()
-            appendLine("请基于以上信息生成群聊分析报告。")
-        }
+        val (systemPrompt, userPrompt) = buildAnalysisPrompt(depth, statsReport, recentLines)
 
         val messages2 = listOf(
             LlmMessage(role = LlmRole.SYSTEM, content = systemPrompt),

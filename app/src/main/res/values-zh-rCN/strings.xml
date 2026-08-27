@@ -3827,4 +3827,22 @@
     <string name="monet_user_current">当前用户</string>
     <string name="monet_user_all">全部用户</string>
     <string name="monet_generate">生成</string>
+    <string name="ui_group_analyse_title">群聊智能分析</string>
+    <string name="ui_group_analyse_context_count">分析上下文条数</string>
+    <string name="ui_group_analyse_context_tip">统计消息越多，分析结果越全面，消耗额度越高</string>
+    <string name="ui_group_analyse_deep">分析深度</string>
+    <string name="ui_group_fast">快速简要</string>
+    <string name="ui_group_normal">标准分析</string>
+    <string name="ui_group_deep">深度解析</string>
+    <string name="ui_group_wuhan">武汉口语</string>
+    <string name="ui_group_result">分析结果</string>
+    <string name="ui_hot_title">话题热度统计</string>
+    <string name="ui_hot_range">统计范围</string>
+    <string name="ui_hot_fast">快速热度</string>
+    <string name="ui_hot_full">完整排行</string>
+    <string name="ui_hot_active">活跃人员</string>
+    <string name="btn_re_analyse">重新分析</string>
+    <string name="btn_copy">复制结果</string>
+    <string name="btn_reply">生成话题小结</string>
+    <string name="ui_tip_ai_only">AI分析仅供参考，内容存在概率偏差</string>
 </resources>

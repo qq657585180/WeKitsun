@@ -3799,4 +3799,22 @@
     <string name="monet_user_current">Current user</string>
     <string name="monet_user_all">All users</string>
     <string name="monet_generate">Generate</string>
+    <string name="ui_group_analyse_title">Group Chat AI Analysis</string>
+    <string name="ui_group_analyse_context_count">Context Messages</string>
+    <string name="ui_group_analyse_context_tip">More messages analyzed, more comprehensive results, higher token usage</string>
+    <string name="ui_group_analyse_deep">Analysis Depth</string>
+    <string name="ui_group_fast">Quick Brief</string>
+    <string name="ui_group_normal">Standard</string>
+    <string name="ui_group_deep">Deep Analysis</string>
+    <string name="ui_group_wuhan">Wuhan Dialect</string>
+    <string name="ui_group_result">Analysis Result</string>
+    <string name="ui_hot_title">Topic Heat Stats</string>
+    <string name="ui_hot_range">Stats Range</string>
+    <string name="ui_hot_fast">Quick Heat</string>
+    <string name="ui_hot_full">Full Ranking</string>
+    <string name="ui_hot_active">Active Members</string>
+    <string name="btn_re_analyse">Re-analyze</string>
+    <string name="btn_copy">Copy Result</string>
+    <string name="btn_reply">Generate Topic Summary</string>
+    <string name="ui_tip_ai_only">AI analysis is for reference only, content may have probabilistic deviations</string>
 </resources>
