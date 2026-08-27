@@ -165,6 +165,7 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         onDismiss: () -> Unit,
     ) {
         val context = LocalContext.current
+        var showConfig by remember { mutableStateOf(false) }
 
         Surface(
             shape = RoundedCornerShape(24.dp),
@@ -172,23 +173,16 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
             tonalElevation = 6.dp,
             modifier = Modifier.fillMaxWidth(0.92f),
         ) {
-            AiReplyMainPanel(
-                messageContent = messageContent,
-                talker = talker,
-                onDismiss = onDismiss,
-                onOpenConfig = {
-                    showComposeDialog(context, directlyDismissable = false) {
-                        Surface(
-                            shape = RoundedCornerShape(24.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 6.dp,
-                            modifier = Modifier.fillMaxWidth(0.92f),
-                        ) {
-                            ModelConfigPanel(onBack = onDismiss)
-                        }
-                    }
-                },
-            )
+            if (showConfig) {
+                ModelConfigPanel(onBack = { showConfig = false })
+            } else {
+                AiReplyMainPanel(
+                    messageContent = messageContent,
+                    talker = talker,
+                    onDismiss = onDismiss,
+                    onOpenConfig = { showConfig = true },
+                )
+            }
         }
     }
 
