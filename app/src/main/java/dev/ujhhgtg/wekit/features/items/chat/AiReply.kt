@@ -491,7 +491,6 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         )
     }
 
-    @Composable
     private suspend fun generateReplies(
         messageContent: String,
         talker: String,
