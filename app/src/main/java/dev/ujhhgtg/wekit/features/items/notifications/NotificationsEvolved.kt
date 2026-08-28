@@ -48,6 +48,7 @@ import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import dev.ujhhgtg.wekit.utils.HostInfo
 import dev.ujhhgtg.wekit.utils.TargetProcesses
 import dev.ujhhgtg.wekit.utils.WeLogger
+import dev.ujhhgtg.wekit.utils.hookBeforeDirectly
 import dev.ujhhgtg.wekit.utils.android.getSystemService
 import dev.ujhhgtg.wekit.utils.collections.LruCache
 import dev.ujhhgtg.wekit.utils.fs.KnownPaths

@@ -328,7 +328,6 @@ object ConversationAggregation : ClickableFeature(),
         WeStartActivityApi.addListener(this)
         // 切换微信账号后 storage 重新初始化（新账号数据库），需要把归拢文件夹
         // 对账写入新账号的库，否则新账号页面看不到归拢。
-        WeDatabaseApi.addDatabaseSwitchListener(::onDatabaseSwitched)
 
         startRefreshThread()
 
