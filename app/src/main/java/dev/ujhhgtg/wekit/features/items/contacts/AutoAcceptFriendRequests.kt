@@ -1,4 +1,5 @@
 package dev.ujhhgtg.wekit.features.items.contacts
+import dev.ujhhgtg.wekit.R
 
 import android.annotation.SuppressLint
 import android.content.ContentValues
@@ -34,7 +35,6 @@ import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexClass
 import dev.ujhhgtg.wekit.dexkit.dsl.dexConstructor
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
-import dev.ujhhgtg.wekit.features.api.core.WeApi
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseListenerApi
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
@@ -42,7 +42,7 @@ import dev.ujhhgtg.wekit.features.api.net.WeNetSceneApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.core.models.MessageType
 import dev.ujhhgtg.wekit.features.core.ClickableFeature
-import dev.ujhhgtg.wekit.features.core.Feature
+import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.preferences.WePrefs
 import dev.ujhhgtg.wekit.preferences.WePrefs.Companion.prefOption
 import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
@@ -65,13 +65,13 @@ import org.luckypray.dexkit.DexKitBridge
 import kotlin.random.Random
 
 @SuppressLint("SetTextI18n")
-@Feature(
-    name = "自动同意好友申请",
-    categories = ["联系人与群组"],
-    description = "自动同意好友申请，支持延迟设置、自动发送欢迎语、黑名单过滤"
-)
 object AutoAcceptFriendRequests : ClickableFeature(), IResolveDex,
     WeDatabaseListenerApi.IInsertListener {
+
+    override val technicalId = "自动同意好友申请"
+    override val nameRes = R.string.feature_auto_accept_friend_requests_name
+    override val categoryIds = listOf(FeatureCategoryIds.CONTACTS_GROUPS)
+    override val descriptionRes = R.string.feature_auto_accept_friend_requests_description
 
     private const val TAG = "AutoAcceptFriendReq"
 

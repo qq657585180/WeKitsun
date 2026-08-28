@@ -3845,4 +3845,6 @@
     <string name="btn_copy">复制结果</string>
     <string name="btn_reply">生成话题小结</string>
     <string name="ui_tip_ai_only">AI分析仅供参考，内容存在概率偏差</string>
+    <string name="feature_auto_accept_friend_requests_name">自动同意好友申请</string>
+    <string name="feature_auto_accept_friend_requests_description">自动同意好友申请，支持延迟设置、自动发送欢迎语、黑名单过滤</string>
 </resources>

@@ -3817,4 +3817,6 @@
     <string name="btn_copy">Copy Result</string>
     <string name="btn_reply">Generate Topic Summary</string>
     <string name="ui_tip_ai_only">AI analysis is for reference only, content may have probabilistic deviations</string>
+    <string name="feature_auto_accept_friend_requests_name">Auto Accept Friend Requests</string>
+    <string name="feature_auto_accept_friend_requests_description">Auto accept friend requests with delay, welcome message and blacklist</string>
 </resources>
