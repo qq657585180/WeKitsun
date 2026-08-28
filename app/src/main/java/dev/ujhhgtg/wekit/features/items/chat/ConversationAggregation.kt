@@ -386,7 +386,6 @@ object ConversationAggregation : ClickableFeature(),
     override fun onDisable() {
         WeDatabaseListenerApi.removeListener(this)
         WeStartActivityApi.removeListener(this)
-        WeDatabaseApi.removeDatabaseSwitchListener(::onDatabaseSwitched)
         CustomLocalFriendAvatars.fallbackUsernameProvider = null
         stopRefreshThread()
 
@@ -454,6 +453,10 @@ object ConversationAggregation : ClickableFeature(),
     /** Public snapshot of the configured folders, for features that let the user pick one. */
     fun aggregationFolders(): List<FolderChoice> =
         loadFolders().map { FolderChoice(it.id, it.name, it.type != FolderType.MANUAL) }
+
+    /** Public member snapshot used by contact pickers that need to filter by folder. */
+    fun folderMembers(folderId: String): List<String> =
+        folderById(folderId)?.let(::getFolderMembers).orEmpty()
 
     /**
      * Adds [talker] to the manual folder [folderId] and opens the existing edit dialog so the
