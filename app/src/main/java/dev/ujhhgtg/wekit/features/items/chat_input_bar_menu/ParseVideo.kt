@@ -42,6 +42,7 @@ import dev.ujhhgtg.wekit.utils.AndroidAudioDecoder
 import dev.ujhhgtg.wekit.utils.AudioUtils
 import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.android.copyToClipboard
+import dev.ujhhgtg.wekit.utils.android.readTextFromClipboard
 import dev.ujhhgtg.wekit.utils.android.showToast
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.div
@@ -219,7 +220,7 @@ fun showParseDialog(context: android.content.Context) {
                 scope.launch {
                     val saveResult = withContext(Dispatchers.IO) {
                         val dir = ensureSaveDir()
-                        val out = java.io.File(dir.toFile(), "video-${UUID.randomUUID()}.mp4")
+                        val out = java.io.File(dir, "video-${UUID.randomUUID()}.mp4")
                         downloadVideo(data.video_link, out)
                     }
                     downloading = false
@@ -278,13 +279,13 @@ fun showParseDialog(context: android.content.Context) {
                         runCatching {
                             val dir = ensureSaveDir()
                             // 1. 下载视频 mp4
-                            val videoFile = java.io.File(dir.toFile(), "video-${UUID.randomUUID()}.mp4")
+                            val videoFile = java.io.File(dir, "video-${UUID.randomUUID()}.mp4")
                             val dl = downloadVideo(data.video_link, videoFile).getOrElse { e -> throw e }
                             // 2. MediaExtractor 提取音轨 -> PCM
-                            val pcmFile = java.io.File(dir.toFile(), "audio-${UUID.randomUUID()}.pcm")
+                            val pcmFile = java.io.File(dir, "audio-${UUID.randomUUID()}.pcm")
                             val decoded = AndroidAudioDecoder.decodeToPcm16(dl.absolutePath, pcmFile)
                             // 3. PCM -> MP3
-                            val mp3File = java.io.File(dir.toFile(), "music-${UUID.randomUUID()}.mp3")
+                            val mp3File = java.io.File(dir, "music-${UUID.randomUUID()}.mp3")
                             val ok = AudioUtils.pcmToMp3(pcmFile.absolutePath, mp3File.absolutePath)
                             // 清理中间文件
                             pcmFile.delete()
