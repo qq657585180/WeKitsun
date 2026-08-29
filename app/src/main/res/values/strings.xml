@@ -3831,4 +3831,21 @@
     <string name="parse_video_sent">Video sent</string>
     <string name="parse_video_no_conversation">No current conversation</string>
     <string name="parse_video_parse_and_send">Parse & Send</string>
+    <string name="parse_video_parse">Parse</string>
+    <string name="parse_video_download">Download</string>
+    <string name="parse_video_copy_link">Copy Link</string>
+    <string name="parse_video_send_video">Send Video</string>
+    <string name="parse_video_delete">Delete File</string>
+    <string name="parse_video_downloading">Downloading...</string>
+    <string name="parse_video_downloaded">Downloaded</string>
+    <string name="parse_video_copied">Link copied</string>
+    <string name="parse_video_deleted">File deleted</string>
+    <string name="parse_video_save_location">Save To</string>
+    <string name="parse_video_save_location_edit">Edit</string>
+    <string name="parse_video_save_location_restore">Restore Default</string>
+    <string name="parse_video_save_location_saved">Save location updated</string>
+    <string name="parse_video_download_music">Download Music</string>
+    <string name="parse_video_music_downloading">Extracting audio...</string>
+    <string name="parse_video_music_downloaded">Music extracted</string>
+    <string name="parse_video_music_download_failed">Music extraction failed</string>
 </resources>

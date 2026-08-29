@@ -3841,4 +3841,21 @@
     <string name="parse_video_sent">视频已发送</string>
     <string name="parse_video_no_conversation">未获取到当前聊天</string>
     <string name="parse_video_parse_and_send">解析并发送</string>
+    <string name="parse_video_parse">解析</string>
+    <string name="parse_video_download">下载视频</string>
+    <string name="parse_video_copy_link">复制直链</string>
+    <string name="parse_video_send_video">发送视频</string>
+    <string name="parse_video_delete">删除文件</string>
+    <string name="parse_video_downloading">下载中...</string>
+    <string name="parse_video_downloaded">下载完成</string>
+    <string name="parse_video_copied">直链已复制</string>
+    <string name="parse_video_deleted">文件已删除</string>
+    <string name="parse_video_save_location">保存位置</string>
+    <string name="parse_video_save_location_edit">修改</string>
+    <string name="parse_video_save_location_restore">恢复默认</string>
+    <string name="parse_video_save_location_saved">保存位置已更新</string>
+    <string name="parse_video_download_music">下载音乐</string>
+    <string name="parse_video_music_downloading">提取音乐中...</string>
+    <string name="parse_video_music_downloaded">音乐已提取</string>
+    <string name="parse_video_music_download_failed">音乐提取失败</string>
 </resources>
