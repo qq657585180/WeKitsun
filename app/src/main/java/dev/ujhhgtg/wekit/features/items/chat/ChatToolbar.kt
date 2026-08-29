@@ -351,7 +351,7 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
         val result = order.filter { it in supportedItems }.distinct().toMutableList()
         if (QUICK_REPLY_NAME !in result) result.add(0, QUICK_REPLY_NAME)
         if (WEAGENT_NAME !in result) result.add(result.indexOf(QUICK_REPLY_NAME), WEAGENT_NAME)
-        if (VIDEO_PARSE_NAME !in result) result.add(WEAGENT_NAME, VIDEO_PARSE_NAME)
+        if (VIDEO_PARSE_NAME !in result) result.add(result.indexOf(WEAGENT_NAME) + 1, VIDEO_PARSE_NAME)
         NAME_TO_ICON_MAP.keys.forEach { if (it !in result) result.add(it) }
         return result
     }

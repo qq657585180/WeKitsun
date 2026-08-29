@@ -42,7 +42,6 @@ import dev.ujhhgtg.wekit.utils.AndroidAudioDecoder
 import dev.ujhhgtg.wekit.utils.AudioUtils
 import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.android.copyToClipboard
-import dev.ujhhgtg.wekit.utils.android.ClipboardUtils
 import dev.ujhhgtg.wekit.utils.android.showToast
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.div
@@ -178,7 +177,7 @@ fun showParseDialog(context: android.content.Context) {
 
             // 自动读取剪贴板中的链接
             androidx.compose.runtime.LaunchedEffect(Unit) {
-                val clip = ClipboardUtils.readTextFromClipboard(appContext) ?: return@LaunchedEffect
+                val clip = readTextFromClipboard(appContext) ?: return@LaunchedEffect
                 if (clip.contains(Regex("""(douyin|kuaishou|bilibili|ixigua|pipix|weishi|haokan|weibo|pearvideo|huya|xiaohongshu|v\.qq|quanmin\.kugou)\.?""")) ) {
                     link = clip
                 }
@@ -257,7 +256,7 @@ fun showParseDialog(context: android.content.Context) {
 
             fun copyDirectLink() {
                 val data = parseResult?.data ?: return
-                runCatching { ClipboardUtils.copyToClipboard(appContext, data.video_link) }
+                runCatching { copyToClipboard(appContext, data.video_link) }
                 showToast(localizedChatInputString(R.string.parse_video_copied))
             }
 
