@@ -1,7 +1,6 @@
 package dev.ujhhgtg.wekit.features.items.chat_input_bar_menu
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,6 +46,7 @@ import dev.ujhhgtg.wekit.utils.android.ClipboardUtils
 import dev.ujhhgtg.wekit.utils.android.showToast
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.div
+import kotlin.io.path.toFile
 import dev.ujhhgtg.wekit.utils.fs.KnownPaths
 import dev.ujhhgtg.wekit.utils.fs.createDirsSafe
 import kotlinx.coroutines.Dispatchers
@@ -275,12 +275,12 @@ fun showParseDialog(context: android.content.Context) {
                 extractingMusic = true
                 errorMsg = null
                 scope.launch {
-                    val result = withContext(Dispatchers.IO) {
+                    val result: Result<Triple<java.io.File, Int, Int>> = withContext(Dispatchers.IO) {
                         runCatching {
                             val dir = ensureSaveDir()
                             // 1. 下载视频 mp4
                             val videoFile = java.io.File(dir.toFile(), "video-${UUID.randomUUID()}.mp4")
-                            val dl = downloadVideo(data.video_link, videoFile).getOrElse { throw it }
+                            val dl = downloadVideo(data.video_link, videoFile).getOrElse { e -> throw e }
                             // 2. MediaExtractor 提取音轨 -> PCM
                             val pcmFile = java.io.File(dir.toFile(), "audio-${UUID.randomUUID()}.pcm")
                             val decoded = AndroidAudioDecoder.decodeToPcm16(dl.absolutePath, pcmFile)
