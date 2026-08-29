@@ -4,6 +4,10 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Parcelable
+import android.view.View
+import android.view.ViewGroup
+import android.widget.GridView
+import android.widget.ImageView
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
 import androidx.compose.ui.res.stringResource
@@ -12,6 +16,7 @@ import dev.ujhhgtg.reflekt.utils.toClass
 import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.dexkit.abc.IResolveDex
 import dev.ujhhgtg.wekit.dexkit.dsl.dexMethod
+import dev.ujhhgtg.wekit.features.api.ui.WeChatInputBarMenuApi
 import dev.ujhhgtg.wekit.features.core.ClickableFeature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.i18n.WeKitLocaleController
@@ -80,6 +85,67 @@ object FakeLocation : ClickableFeature(), IResolveDex {
             it.hookBefore {
                 val tencentLocation = args[0]
                 hookTencentLocation(tencentLocation)
+            }
+        }
+        hookLocationPanelLongClick()
+    }
+
+    // ==================== 聊天面板长按「位置」图标入口 ====================
+    private val hookedLongClickListeners = ConcurrentHashMap.newKeySet<Any>()
+
+    /** 判断 ImageView 的 drawable 资源名是否为位置图标 panel_icon_location */
+    private fun isLocationIcon(view: View): Boolean = runCatching {
+        if (view !is ImageView) return@runCatching false
+        // ImageView 内部用 mResource 字段保存 setImageResource() 的资源 ID
+        val mResource = ImageView::class.java.getDeclaredField("mResource")
+        mResource.isAccessible = true
+        val resId = mResource.getInt(view)
+        if (resId == 0) return@runCatching false
+        val name = view.context.resources.getResourceEntryName(resId)
+        name == "panel_icon_location"
+    }.getOrDefault(false)
+
+    /** 递归收集 View 子树中所有可见的 ImageView */
+    private fun collectImageViews(view: View, out: MutableList<ImageView>) {
+        when (view) {
+            is ImageView -> {
+                if (view.isShown || view.visibility == View.VISIBLE) out.add(view)
+            }
+            is ViewGroup -> {
+                for (i in 0 until view.childCount) {
+                    collectImageViews(view.getChildAt(i), out)
+                }
+            }
+        }
+    }
+
+    /** Hook 聊天面板 AppGrid：识别位置图标并劫持长按事件 */
+    private fun hookLocationPanelLongClick() {
+        WeChatInputBarMenuApi.methodAppGridGetView.hookAfter {
+            val itemView = result as? View ?: return@hookAfter
+            val grid = thisObject as? GridView ?: return@hookAfter
+
+            // 递归收集该 item 的所有 ImageView，判断是否为位置图标
+            val images = mutableListOf<ImageView>()
+            collectImageViews(itemView, images)
+            val isLocation = images.any(::isLocationIcon)
+            if (!isLocation) return@hookAfter
+
+            // 劫持长按：对该 GridView 的 OnItemLongClickListener 做 hook（每个 listener 只 hook 一次）
+            val listener = grid.onItemLongClickListener ?: return@hookAfter
+            if (!hookedLongClickListeners.add(listener)) return@hookAfter
+
+            runCatching {
+                grid.onItemLongClickListener = object : GridView.OnItemLongClickListener {
+                    override fun onItemLongClick(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long): Boolean {
+                        val context = parent?.context ?: view?.context ?: return@onItemLongClick false
+                        showLocationPickerChooser(context)
+                        return true
+                    }
+                }
+                WeLogger.i(TAG, "location panel long-click hooked")
+            }.onFailure { e ->
+                WeLogger.w(TAG, "failed to hook location panel long-click", e)
             }
         }
     }
