@@ -3819,4 +3819,16 @@
     <string name="ui_tip_ai_only">AI analysis is for reference only, content may have probabilistic deviations</string>
     <string name="feature_auto_accept_friend_requests_name">Auto Accept Friend Requests</string>
     <string name="feature_auto_accept_friend_requests_description">Auto accept friend requests with delay, welcome message and blacklist</string>
+    <string name="feature_parse_video_name">Video Parser</string>
+    <string name="feature_parse_video_description">Parse Douyin/Kuaishou/Bilibili links, download watermark-free video and send to current chat</string>
+    <string name="parse_video_link_hint">Paste video link</string>
+    <string name="parse_video_link_placeholder">https://v.douyin.com/... or b23.tv/...</string>
+    <string name="parse_video_loading">Parsing and downloading...</string>
+    <string name="parse_video_link_empty">Please paste a video link first</string>
+    <string name="parse_video_api_error">Parse failed, check the link</string>
+    <string name="parse_video_download_failed">Download failed: %1$s</string>
+    <string name="parse_video_send_failed">Send failed, check logs</string>
+    <string name="parse_video_sent">Video sent</string>
+    <string name="parse_video_no_conversation">No current conversation</string>
+    <string name="parse_video_parse_and_send">Parse & Send</string>
 </resources>

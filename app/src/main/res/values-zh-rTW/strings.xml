@@ -3829,4 +3829,16 @@
     <string name="ui_tip_ai_only">AI分析仅供参考，内容存在概率偏差</string>
     <string name="feature_auto_accept_friend_requests_name">自动同意好友申请</string>
     <string name="feature_auto_accept_friend_requests_description">自动同意好友申请，支持延迟设置、自动发送欢迎语、黑名单过滤</string>
+    <string name="feature_parse_video_name">短视频解析</string>
+    <string name="feature_parse_video_description">解析抖音/快手/B站等短视频链接，下载无水印视频并发送到当前聊天</string>
+    <string name="parse_video_link_hint">粘贴短视频链接</string>
+    <string name="parse_video_link_placeholder">https://v.douyin.com/... 或 b23.tv/...</string>
+    <string name="parse_video_loading">正在解析并下载，请稍候...</string>
+    <string name="parse_video_link_empty">请先输入或粘贴视频链接</string>
+    <string name="parse_video_api_error">解析失败，请检查链接是否有效</string>
+    <string name="parse_video_download_failed">视频下载失败：%1$s</string>
+    <string name="parse_video_send_failed">视频发送失败，请查看日志</string>
+    <string name="parse_video_sent">视频已发送</string>
+    <string name="parse_video_no_conversation">未获取到当前聊天</string>
+    <string name="parse_video_parse_and_send">解析并发送</string>
 </resources>
