@@ -7,6 +7,7 @@ import android.os.Parcelable
 import android.view.View
 import android.view.ViewGroup
 import android.widget.GridView
+import android.widget.AdapterView
 import android.widget.ImageView
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Text
@@ -136,7 +137,7 @@ object FakeLocation : ClickableFeature(), IResolveDex {
             if (!hookedLongClickListeners.add(listener)) return@hookAfter
 
             runCatching {
-                grid.onItemLongClickListener = object : GridView.OnItemLongClickListener {
+                grid.onItemLongClickListener = object : AdapterView.OnItemLongClickListener {
                     override fun onItemLongClick(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long): Boolean {
                         val context = parent?.context ?: view?.context ?: return@onItemLongClick false
                         showLocationPickerChooser(context)
