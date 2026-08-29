@@ -46,7 +46,6 @@ import dev.ujhhgtg.wekit.utils.android.readTextFromClipboard
 import dev.ujhhgtg.wekit.utils.android.showToast
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.div
-import kotlin.io.path.toFile
 import dev.ujhhgtg.wekit.utils.fs.KnownPaths
 import dev.ujhhgtg.wekit.utils.fs.createDirsSafe
 import kotlinx.coroutines.Dispatchers
