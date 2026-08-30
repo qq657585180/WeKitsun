@@ -78,7 +78,15 @@ graph TD
 - `TtsContent` 增加 FISH 分支：音色单选列表（显示名 + reference_id）+ 「管理音色」按钮；转换/发送按钮逻辑与现有 mode 一致。
 - `VoicePanelSheet.kt` 的 TTS 分发处（约 line 1449）增加 `TtsMode.FISH -> actions.synthesizeFish(ttsText, selectedFishVoiceId)`。
 
-#### 2.3 VoicePanelActions 扩展
+#### 2.3 内置预设音色库
+新增 `app/src/main/java/dev/ujhhgtg/wekit/features/items/chat/panel/voice/FishVoices.kt`：
+
+- `data class FishVoice(val name: String, val referenceId: String)`。
+- `FISH_PRESET_VOICES: List<FishVoice>` 内置 134 个预设音色，来源为 `"id|显示名称"` 原始表（`FISH_PRESET_RAW`），加载时按 `|` 拆分为 `FishVoice`。
+- 音色选择列表 = 内置预设 + 用户自定义（MMKV `voice_fish_voices`），按名称展示；预设不可删除，用户自定义可增删。
+- 注意：预设 ID 为腾讯云 BigTTS 风格（`*_uranus_bigtts`/`saturn_*`），与 Fish Audio 官方 `reference_id`（UUID）格式不同，实测兼容性在实现阶段用真实 API Key 验证；若官方接口不接受此类 ID，通过配置对话框的用户自定义音色手动指定可用 reference_id。
+
+#### 2.4 VoicePanelActions 扩展
 `app/src/main/java/dev/ujhhgtg/wekit/ui/panel/VoicePanelSheet.kt` 的 `data class VoicePanelActions` 增加：
 
 ```kotlin
@@ -124,7 +132,7 @@ val deleteFishVoice: suspend (referenceId: String) -> Result<Unit> = { Result.fa
 | Key | 类型 | 说明 |
 |---|---|---|
 | `voice_fish_api_key` | String | Fish Audio API Key |
-| `voice_fish_voices` | JSON String | 音色列表：`[{"name":"温柔女声","referenceId":"xxxx"}]` |
+| `voice_fish_voices` | JSON String | 用户自定义音色列表：`[{"name":"温柔女声","referenceId":"xxxx"}]`（内置预设见 `FISH_PRESET_VOICES`，不可删除） |
 | `voice_fish_selected_id` | String | 当前选中音色 reference_id |
 | `voice_directory_url` | String | 自定义在线目录源 URL |
 
