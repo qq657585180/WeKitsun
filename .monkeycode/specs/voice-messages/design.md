@@ -5,9 +5,9 @@ Updated: 2026-08-30
 
 ## Description
 
-WeKit 为微信聊天提供语音消息能力：在聊天页通过长按消息菜单或聊天工具栏打开语音面板，支持 Fish Audio 文字转语音（TTS）、语音包管理与发送、自定义在线语音目录下载，并以微信原生语音消息发送到当前会话。
+WeKit 为微信聊天提供语音消息能力：在聊天页通过长按消息菜单或聊天工具栏打开语音面板，支持 tiax（ULikeCam 版）文字转语音（TTS，458 音色，免费接口）、语音包管理与发送、自定义在线语音目录下载，并以微信原生语音消息发送到当前会话。
 
-调研结论：WeKit 上游 dev 分支已合并一套完整的语音面板基础设施（`VoicePanel` + `VoicePanelSheet` + `VoicePanelActions`），覆盖语音包管理、试听、发送、Edge TTS、系统 TTS、声音克隆、在线提供商（FunBox/铃声多多/千变语音2）。本设计采用**增量扩展**策略：复用现有面板与发送链，新增缺失的 Fish Audio TTS、自定义在线目录源、ChatToolbar/长按消息菜单入口与独立配置。
+调研结论：WeKit 上游 dev 分支已合并一套完整的语音面板基础设施（`VoicePanel` + `VoicePanelSheet` + `VoicePanelActions`），覆盖语音包管理、试听、发送、Edge TTS、系统 TTS、声音克隆、在线提供商（FunBox/铃声多多/千变语音2）。本设计采用**增量扩展**策略：复用现有面板与发送链，新增缺失的 tiax ULikeCam TTS、自定义在线目录源、ChatToolbar/长按消息菜单入口与独立配置。
 
 ## Architecture
 
@@ -17,10 +17,10 @@ graph TD
     B["长按消息菜单入口"] --> E
     C["ChatFooterHooks 长按语音键"] --> E
     E --> F["showVoicePanelSheet + VoicePanelActions"]
-    F --> G["TtsContent(FISH mode)"]
+    F --> G["TtsContent(TIAX mode)"]
     F --> H["语音包标签页(已有)"]
-    G --> I["FishAudioClient"]
-    I --> J["Fish Audio REST api"]
+    G --> I["TiaxTtsClient"]
+    I --> J["https://www.tiax.pw/API/yuyin2.php"]
     F --> K["VoiceProviderRegistry"]
     K --> L["CustomDirectoryVoiceProvider(新增)"]
     K --> M["内置提供商(已有)"]
@@ -60,43 +60,40 @@ graph TD
 #### 1.3 现有入口
 `ChatFooterHooks.kt`（长按聊天输入栏语音键）保持不变，三者共存。
 
-### 2. Fish Audio TTS（新增）
+### 2. tiax ULikeCam TTS（新增，主要 TTS 源）
 
-#### 2.1 FishAudioClient
-新增 `app/src/main/java/dev/ujhhgtg/wekit/utils/FishAudioClient.kt`，采用 OkHttp 模式（参照 `VoiceProviders.kt` 的 `getText`/`awaitResponse`）。
+#### 2.1 TiaxTtsClient
+新增 `app/src/main/java/dev/ujhhgtg/wekit/utils/TiaxTtsClient.kt`，采用 OkHttp 模式（参照 `VoiceProviders.kt` 的 `getText`/`awaitResponse`）。
 
-- 接口：`suspend fun synthesize(text: String, referenceId: String?, apiKey: String): Result<File>`。
-- 请求：`POST https://api.fish.audio/v1/tts`，Header `Authorization: Bearer $apiKey`、`model: s2.1-pro-free`，Body JSON `{ "text": ..., "reference_id": ..., "format": "mp3", "chunk_length": 300, "normalize": true }`。
-- 响应为 mp3 二进制流，写入 `PanelPaths.panelCacheDir` 临时文件，返回 `File`。
+- 接口：`suspend fun synthesize(text: String, voiceIndex: Int, apiKey: String): Result<File>`。
+- 请求（GET）：`https://www.tiax.pw/API/yuyin2.php?apikey=<key>&text=<URL 编码文本>&voice=<1..458>`。`voice` 为 1-based 序号（`voiceIndex + 1`）。
+- 成功响应（HTTP 200 JSON）：`{"code":"200","url":"<bytecdn mp3 临时链接>"}`，随后 `GET url` 下载 mp3 至 `PanelPaths.panelCacheDir` 临时文件，返回 `File`。
+- 失败响应：HTTP 400 JSON `{"code":400,"msg":"缺少 text 参数"}`、HTTP 403 JSON（缺少/无效 API 密钥）；非 200 或 `url` 缺失视为失败。
 - 时长通过 `AudioUtils.getDurationMs` 读取。
-- 错误分类：HTTP 4xx（Key 无效/限额）、5xx（服务端）、网络异常；将状态码与响应体写入 `WeLogger`。
+- 错误分类：密钥问题（403）、请求参数问题（400）、服务端/网络异常；状态码与响应体写入 `WeLogger`。
 
 #### 2.2 TtsMode 扩展
 `app/src/main/java/dev/ujhhgtg/wekit/ui/panel/VoicePanelTtsContent.kt`：
 
-- `TtsMode` 增加 `FISH`。
-- `TtsContent` 增加 FISH 分支：音色单选列表（显示名 + reference_id）+ 「管理音色」按钮；转换/发送按钮逻辑与现有 mode 一致。
-- `VoicePanelSheet.kt` 的 TTS 分发处（约 line 1449）增加 `TtsMode.FISH -> actions.synthesizeFish(ttsText, selectedFishVoiceId)`。
+- `TtsMode` 增加 `TIAX`。
+- `TtsContent` 增加 TIAX 分支：音色单选列表（458 个显示名）+「管理音色」按钮；转换/发送按钮逻辑与现有 mode 一致。
+- `VoicePanelSheet.kt` 的 TTS 分发处（约 line 1449）增加 `TtsMode.TIAX -> actions.synthesizeTiax(ttsText, selectedTiaxVoiceIndex)`。
 
 #### 2.3 内置预设音色库
-新增 `app/src/main/java/dev/ujhhgtg/wekit/features/items/chat/panel/voice/FishVoices.kt`：
+新增 `app/src/main/java/dev/ujhhgtg/wekit/features/items/chat/panel/voice/TiaxVoices.kt`：
 
-- `data class FishVoice(val name: String, val referenceId: String)`。
-- `FISH_PRESET_VOICES: List<FishVoice>` 内置 134 个预设音色，来源为 `"id|显示名称"` 原始表（`FISH_PRESET_RAW`），加载时按 `|` 拆分为 `FishVoice`。
-- 音色选择列表 = 内置预设 + 用户自定义（MMKV `voice_fish_voices`），按名称展示；预设不可删除，用户自定义可增删。
-- 注意：预设 ID 为腾讯云 BigTTS 风格（`*_uranus_bigtts`/`saturn_*`），与 Fish Audio 官方 `reference_id`（UUID）格式不同，实测兼容性在实现阶段用真实 API Key 验证；若官方接口不接受此类 ID，通过配置对话框的用户自定义音色手动指定可用 reference_id。
+- `data class TiaxVoice(val name: String)`；序号即 `ys.php` 行号（1-based），展示顺序与 `ys.php` 一致。
+- `TIAX_PRESET_VOICES: List<TiaxVoice>` 内置 458 个音色名（来源：`https://www.tiax.pw/API/ys.php` 逐行抓取），含重复项（如「八戒」「紫薇」「康康舞曲」等，为平台原始数据，保留）。
+- 音色选择列表 = 内置 458 项（不可删除），仅记录选中序号。
 
 #### 2.4 VoicePanelActions 扩展
 `app/src/main/java/dev/ujhhgtg/wekit/ui/panel/VoicePanelSheet.kt` 的 `data class VoicePanelActions` 增加：
 
 ```kotlin
-val loadFishVoices: suspend () -> Result<List<FishVoice>> = { Result.failure(UnsupportedOperationException()) },
-val synthesizeFish: suspend (String, String?) -> Result<Unit> = { _, _ -> Result.failure(UnsupportedOperationException()) },
-val saveFishVoice: suspend (name: String, referenceId: String) -> Result<Unit> = { _, _ -> Result.failure(UnsupportedOperationException()) },
-val deleteFishVoice: suspend (referenceId: String) -> Result<Unit> = { Result.failure(UnsupportedOperationException()) },
+val synthesizeTiax: suspend (String, Int) -> Result<Unit> = { _, _ -> Result.failure(UnsupportedOperationException()) },
 ```
 
-`FishVoice(name: String, referenceId: String)` 数据类新增于 `ui/panel/VoicePanelSheet.kt` 或独立文件。`VoicePanel.kt` 的 `buildActions` 实现这些回调（读写 MMKV，见 Data Models）。
+`VoicePanel.kt` 的 `buildActions` 实现该回调（读取 MMKV，调用 `TiaxTtsClient`，见 Data Models）。
 
 ### 3. 自定义在线语音目录（新增）
 
@@ -114,9 +111,9 @@ val deleteFishVoice: suspend (referenceId: String) -> Result<Unit> = { Result.fa
 
 在语音面板标题栏增加齿轮入口（`VoicePanelSheet.kt` 标题行），点击打开配置对话框（参照 `AiReply.kt` 的 `ModelConfigPanel` 模式：二级 `showComposeDialog`）：
 
-- **Fish Audio 配置**：API Key 输入（密码框）、音色条目 CRUD（名称 + reference_id）、连接测试按钮。
+- **tiax 配置**：API Key 输入（密码框）、连接测试按钮。
 - **在线目录配置**：目录源 URL 输入。
-- 保存写入 MMKV `voice_fish_*` / `voice_directory_url` 键（见 Data Models），保存后立即生效（面板状态保持）。
+- 保存写入 MMKV `voice_tiax_*` / `voice_directory_url` 键（见 Data Models），保存后立即生效（面板状态保持）。
 
 ### 5. 复用组件（不改动）
 
@@ -131,9 +128,8 @@ val deleteFishVoice: suspend (referenceId: String) -> Result<Unit> = { Result.fa
 
 | Key | 类型 | 说明 |
 |---|---|---|
-| `voice_fish_api_key` | String | Fish Audio API Key |
-| `voice_fish_voices` | JSON String | 用户自定义音色列表：`[{"name":"温柔女声","referenceId":"xxxx"}]`（内置预设见 `FISH_PRESET_VOICES`，不可删除） |
-| `voice_fish_selected_id` | String | 当前选中音色 reference_id |
+| `voice_tiax_apikey` | String | tiax 平台 API Key（`https://www.tiax.pw`，ULikeCam 版为免费接口） |
+| `voice_tiax_vidx` | Int | 当前选中音色序号（0-based，请求时 `+1` 得到 `ys.php` 行号 1..458） |
 | `voice_directory_url` | String | 自定义在线目录源 URL |
 
 通过 `WePrefs.prefOption` delegate 声明（参照 `AiReply.ModelConfig` 的 `WePrefs.prefOption` 用法）。
@@ -158,18 +154,20 @@ val deleteFishVoice: suspend (referenceId: String) -> Result<Unit> = { Result.fa
 ## Correctness Properties
 
 - 任一时刻仅一段音频播放（复用 `VoicePreview` 单实例约束）。
-- Fish Audio 请求未配置 API Key 时不发起网络请求，直接提示配置。
+- tiax 请求未配置 API Key 时不发起网络请求，直接提示配置。
 - TTS 生成产物（mp3/silk 临时文件）在使用后删除；`DisposableEffect` 清理。
 - `sendVoice` 的 `durationMs` 钳制在 `1..60_000`（现有实现保证）。
 - ChatToolbar 注入条目在语音面板功能关闭时不可见（`enabledItems` 过滤逻辑复用）。
 - 语音消息菜单入口与语音面板开关相互独立，但都要求 VoicePanel 打开路径可达。
+- `voice_tiax_vidx` 越界时钳制到 `0..457`（服务端对越界序号回退音色 1）。
 
 ## Error Handling
 
 | 场景 | 处理 |
 |---|---|
-| Fish Audio Key 无效（401/403） | 面板内显示错误信息 + 打开配置对话框 |
-| Fish Audio 服务端错误（5xx） | 显示错误码与消息，保留输入文字与音色 |
+| tiax Key 无效（403 缺少/无效密钥） | 面板内显示错误信息 + 打开配置对话框 |
+| tiax 参数错误（400，如缺少 text） | 显示错误消息，保留输入文字与音色 |
+| tiax 响应缺失 `url` 或下载 mp3 失败 | 显示失败原因，保留状态 |
 | 网络中断/超时 | 显示网络错误，保留状态 |
 | 目录源 URL 未配置 | 提示进入配置填写 URL |
 | 目录 JSON 格式无效 | 显示解析失败原因，保留已缓存条目 |
@@ -178,13 +176,13 @@ val deleteFishVoice: suspend (referenceId: String) -> Result<Unit> = { Result.fa
 
 ## Test Strategy
 
-- 网络与 TTS 行为依赖真实 Fish Audio 账号与微信宿主，无法在桌面 JVM 测试，遵循 AGENTS.md 测试策略：以真机手工验证为主。
+- 网络与 TTS 行为依赖真实 tiax 账号与微信宿主，无法在桌面 JVM 测试，遵循 AGENTS.md 测试策略：以真机手工验证为主。
 - 新增 DexKit 解析：本项目无新增 dex 目标（发送链复用 `WeMessageApi.sendVoice` 既有解析），无需 `./x dex-test` 变更；若实现阶段发现需调整，按 AGENTS.md 规则执行。
 - 提交前执行 `./x build` 与 `git diff --check`。
-- 手工验证清单：ChatToolbar 注入条目可见性/排序/开关联动；长按消息菜单项；Fish Audio 生成→试听→保存→发送；自定义目录加载与下载；面板关闭后播放器释放。
+- 手工验证清单：ChatToolbar 注入条目可见性/排序/开关联动；长按消息菜单项；tiax 生成→试听→保存→发送（多音色对比）；自定义目录加载与下载；面板关闭后播放器释放。
 
 ## References
 
 - 现有实现：`app/src/main/java/dev/ujhhgtg/wekit/features/items/chat/VoicePanel.kt`、`ui/panel/VoicePanelSheet.kt`、`ui/panel/VoicePanelTtsContent.kt`、`features/items/chat/panel/voice/VoiceProviders.kt`、`features/api/core/WeMessageApi.kt`（`sendVoice`）、`utils/AudioUtils.kt`。
 - 入口参考：`features/items/chat/AiReply.kt`（长按菜单）、`features/items/chat/ChatToolbar.kt`（工具栏注入）。
-- Fish Audio REST：`https://api.fish.audio/v1/tts`（Bearer 认证，`model: s2.1-pro-free`）。
+- tiax 接口（实测确认）：`https://www.tiax.pw/API/yuyin2.php`，GET 参数 `apikey`/`text`/`voice`（1..458），成功返回 JSON `{"code":"200","url":"<mp3>"}`，二次下载；音色列表 `https://www.tiax.pw/API/ys.php`（`序号. 名称`，458 行）。
