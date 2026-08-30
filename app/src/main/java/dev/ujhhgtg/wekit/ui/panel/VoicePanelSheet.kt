@@ -23,12 +23,13 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import dev.ujhhgtg.wekit.ui.utils.ListItem
-import dev.ujhhgtg.wekit.ui.utils.ReorderableList
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -91,6 +92,7 @@ import dev.ujhhgtg.wekit.features.items.chat.panel.VoicePack
 import dev.ujhhgtg.wekit.features.items.chat.panel.VoicePackLayout
 import dev.ujhhgtg.wekit.features.items.chat.panel.VoicePreview
 import dev.ujhhgtg.wekit.features.items.chat.panel.VoiceProviderPage
+import dev.ujhhgtg.wekit.features.items.chat.panel.PanelPaths
 import dev.ujhhgtg.wekit.features.items.chat.panel.parallelForEachWithProgress
 import dev.ujhhgtg.wekit.features.items.chat.panel.panelUiText
 import dev.ujhhgtg.wekit.features.items.chat.panel.toPanelUiText
@@ -106,8 +108,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.io.path.deleteIfExists
 import kotlin.io.path.fileSize
 import kotlin.time.Duration.Companion.milliseconds
+import dev.ujhhgtg.wekit.utils.TiaxTtsClient
+import dev.ujhhgtg.wekit.utils.serialization.DefaultJson
 
 data class VoicePanelActions(
     val reloadLocal: suspend () -> List<VoicePack> = { emptyList() },
@@ -144,6 +149,12 @@ data class VoicePanelActions(
         Result.failure(UnsupportedOperationException())
     },
     val convertSystem: suspend (String) -> Result<VoicePreview> = {
+        Result.failure(UnsupportedOperationException())
+    },
+    val convertTiax: suspend (String, Int) -> Result<VoicePreview> = { _, _ ->
+        Result.failure(UnsupportedOperationException())
+    },
+    val synthesizeTiax: suspend (String, Int) -> Result<Unit> = { _, _ ->
         Result.failure(UnsupportedOperationException())
     },
     val loadClones: suspend () -> List<CloneVoice> = { emptyList() },
@@ -270,6 +281,8 @@ private fun VoicePanelContent(
     var ttsMode by remember { mutableStateOf(rememberedNavigation?.ttsMode ?: TtsMode.EDGE) }
     var ttsText by remember { mutableStateOf("") }
     var selectedEdgeVoice by remember { mutableStateOf(PanelSettings.selectedEdgeVoice) }
+    var selectedTiaxVoiceIndex by remember { mutableStateOf(PanelSettings.tiaxVoiceIndex) }
+    var tiaxConfigureOpen by remember { mutableStateOf(false) }
     var convertedTts by remember { mutableStateOf<VoicePreview?>(null) }
     var convertedTtsTitle by remember { mutableStateOf<PanelUiText?>(null) }
     var clones by remember { mutableStateOf<List<CloneVoice>>(emptyList()) }
@@ -804,6 +817,7 @@ private fun VoicePanelContent(
                         TtsMode.SYSTEM -> actions.convertSystem(ttsText)
                         TtsMode.EDGE -> actions.convertEdge(ttsText, selectedEdgeVoice)
                         TtsMode.CLONE -> actions.convertClone(ttsText, selectedClone!!)
+                        TtsMode.TIAX -> actions.convertTiax(ttsText, selectedTiaxVoiceIndex)
                     }
                     progressMessage = null
                     result.onSuccess { preview ->
@@ -813,6 +827,7 @@ private fun VoicePanelContent(
                             TtsMode.EDGE -> panelUiText(R.string.tts_mode_edge)
                             TtsMode.CLONE -> selectedClone?.name?.let(PanelUiText::Raw)
                                 ?: panelUiText(R.string.tts_mode_clone)
+                            TtsMode.TIAX -> panelUiText(R.string.tts_mode_tiax)
                         }
                     }.onFailure { operationMessage = it.toPanelUiText(R.string.voice_panel_error_tts_convert) }
                 }
@@ -1421,6 +1436,7 @@ private fun VoicePanelContent(
                         converted = convertedTts != null,
                         selectedClone = selectedClone,
                         selectedEdgeVoice = selectedEdgeVoice,
+                        selectedTiaxVoiceIndex = selectedTiaxVoiceIndex,
                         onModeChange = { clearConvertedTts(); ttsMode = it },
                         onTextChange = { clearConvertedTts(); ttsText = it },
                         onSelectEdgeVoice = { voice ->
@@ -1428,7 +1444,14 @@ private fun VoicePanelContent(
                             selectedEdgeVoice = voice
                             PanelSettings.selectedEdgeVoice = voice
                         },
-                        onChooseOrManage = { managingClones = true },
+                        onSelectTiaxVoice = { index ->
+                            clearConvertedTts()
+                            selectedTiaxVoiceIndex = index
+                            PanelSettings.tiaxVoiceIndex = index
+                        },
+                        onChooseOrManage = {
+                            if (ttsMode == TtsMode.TIAX) tiaxConfigureOpen = true else managingClones = true
+                        },
                         onConvert = ::convertTts,
                         onPreviewConverted = {
                             convertedTts?.let { generated ->
@@ -1456,6 +1479,7 @@ private fun VoicePanelContent(
                                                     ),
                                                 ),
                                             )
+                                        TtsMode.TIAX -> actions.synthesizeTiax(ttsText, selectedTiaxVoiceIndex)
                                     }
                                     progressMessage = null
                                     showToastSuspend(
@@ -1767,6 +1791,12 @@ private fun VoicePanelContent(
                         refreshClones()
                     }
                 },
+            )
+        }
+
+        if (tiaxConfigureOpen) {
+            TiaxConfigurePage(
+                onDismiss = { tiaxConfigureOpen = false },
             )
         }
 
@@ -3068,4 +3098,95 @@ private fun fallbackAudioMime(path: String): String = when (MediaFileTypeDetecto
     MediaFileTypeDetector.AudioFormat.SILK -> "audio/silk"
     MediaFileTypeDetector.AudioFormat.FLAC -> "audio/flac"
     else -> "application/octet-stream"
+}
+
+@Composable
+private fun TiaxConfigurePage(onDismiss: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    var apiKey by remember { mutableStateOf(PanelSettings.tiaxApiKey) }
+    var directoryUrl by remember { mutableStateOf(PanelSettings.voiceDirectoryUrl) }
+    var testing by remember { mutableStateOf(false) }
+    var testResult by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+
+    PanelPageOverlay(onDismiss = onDismiss, onBack = onDismiss) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDismiss) {
+                Icon(MaterialSymbols.Outlined.Arrow_back, stringResource(R.string.panel_action_back))
+            }
+            Text(
+                stringResource(R.string.voice_tiax_configure_title),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onDismiss) {
+                Icon(MaterialSymbols.Outlined.Close, stringResource(R.string.dialog_close))
+            }
+        }
+        OutlinedTextField(
+            value = apiKey,
+            onValueChange = {
+                apiKey = it
+                PanelSettings.tiaxApiKey = it.trim()
+                testResult = null
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.tiax_apikey_label)) },
+            placeholder = { Text(stringResource(R.string.tiax_apikey_placeholder)) },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = directoryUrl,
+            onValueChange = {
+                directoryUrl = it
+                PanelSettings.voiceDirectoryUrl = it.trim()
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.voice_directory_url_label)) },
+            singleLine = true,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = {
+                    val key = PanelSettings.tiaxApiKey
+                    if (key.isBlank()) {
+                        testResult = false to stringResource(R.string.tiax_apikey_required)
+                        return@OutlinedButton
+                    }
+                    testing = true
+                    testResult = null
+                    scope.launch {
+                        val path = PanelPaths.panelCacheDir / "tiax-test-${java.util.UUID.randomUUID()}.mp3"
+                        val result = try {
+                            TiaxTtsClient.synthesizeToMp3("测试", path, 0, key)
+                                .map { path.toFile().length() }
+                        } finally {
+                            path.deleteIfExists()
+                        }
+                        testing = false
+                        testResult = result.fold(
+                            onSuccess = { size -> true to stringResource(R.string.tiax_connection_success, "$size B") },
+                            onFailure = { error -> false to stringResource(R.string.tiax_connection_failed, error.message ?: "unknown") },
+                        )
+                    }
+                },
+                enabled = !testing,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(
+                    if (testing) stringResource(R.string.tiax_testing)
+                    else stringResource(R.string.tiax_test_connection),
+                )
+            }
+            Button(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.action_save))
+            }
+        }
+        testResult?.let { (success, message) ->
+            Text(
+                message,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+        }
+    }
 }

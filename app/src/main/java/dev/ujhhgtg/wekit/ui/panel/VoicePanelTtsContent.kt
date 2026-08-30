@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,8 +34,9 @@ import com.composables.icons.materialsymbols.outlined.Send
 import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.features.items.chat.EDGE_TTS_VOICES
 import dev.ujhhgtg.wekit.features.items.chat.panel.CloneVoice
+import dev.ujhhgtg.wekit.features.items.chat.panel.voice.TIAX_PRESET_VOICES
 
-internal enum class TtsMode { SYSTEM, EDGE, CLONE }
+internal enum class TtsMode { SYSTEM, EDGE, CLONE, TIAX }
 
 @Composable
 internal fun TtsContent(
@@ -43,9 +45,11 @@ internal fun TtsContent(
     converted: Boolean,
     selectedClone: CloneVoice?,
     selectedEdgeVoice: String,
+    selectedTiaxVoiceIndex: Int,
     onModeChange: (TtsMode) -> Unit,
     onTextChange: (String) -> Unit,
     onSelectEdgeVoice: (String) -> Unit,
+    onSelectTiaxVoice: (Int) -> Unit,
     onChooseOrManage: () -> Unit,
     onConvert: () -> Unit,
     onPreviewConverted: () -> Unit,
@@ -62,6 +66,7 @@ internal fun TtsContent(
                 item { TtsModeOption(stringResource(R.string.tts_mode_system), mode == TtsMode.SYSTEM) { onModeChange(TtsMode.SYSTEM) } }
                 item { TtsModeOption(stringResource(R.string.tts_mode_edge), mode == TtsMode.EDGE) { onModeChange(TtsMode.EDGE) } }
                 item { TtsModeOption(stringResource(R.string.tts_mode_clone), mode == TtsMode.CLONE) { onModeChange(TtsMode.CLONE) } }
+                item { TtsModeOption(stringResource(R.string.tts_mode_tiax), mode == TtsMode.TIAX) { onModeChange(TtsMode.TIAX) } }
             }
         }
         item {
@@ -92,6 +97,30 @@ internal fun TtsContent(
                         RadioButton(
                             selected = selectedEdgeVoice == voice.id,
                             onClick = { onSelectEdgeVoice(voice.id) },
+                        )
+                    },
+                )
+            }
+        } else if (mode == TtsMode.TIAX) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.tts_choose_voice), style = MaterialTheme.typography.titleSmall)
+                    OutlinedButton(onClick = onChooseOrManage) { Text(stringResource(R.string.tts_manage_tiax)) }
+                }
+            }
+            itemsIndexed(TIAX_PRESET_VOICES, key = { index, _ -> index }) { index, voice ->
+                ListItem(
+                    modifier = Modifier.clickable { onSelectTiaxVoice(index) },
+                    colors = panelListItemColors(),
+                    content = { Text("${index + 1}. ${voice.name}") },
+                    leadingContent = {
+                        RadioButton(
+                            selected = selectedTiaxVoiceIndex == index,
+                            onClick = { onSelectTiaxVoice(index) },
                         )
                     },
                 )

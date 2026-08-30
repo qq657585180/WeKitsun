@@ -50,6 +50,7 @@ interface VoiceProvider {
 /** Fixed built-in provider registry. */
 object VoiceProviderRegistry {
     val providers: List<VoiceProvider> = listOf(
+        CustomDirectoryVoiceProvider,
         FunBoxShareVoiceProvider,
         RingDuoDuoVoiceProvider,
         UoiceVoiceProvider,
@@ -58,6 +59,7 @@ object VoiceProviderRegistry {
     fun get(id: String): VoiceProvider = providers.firstOrNull { it.id == id } ?: providers.first()
 
     fun forItem(item: VoiceItem): VoiceProvider? = when {
+        item.id.startsWith("custom:") -> CustomDirectoryVoiceProvider
         item.id.startsWith("funbox:") -> FunBoxShareVoiceProvider
         item.id.startsWith("ring:") -> RingDuoDuoVoiceProvider
         item.id.startsWith("uoice:") -> UoiceVoiceProvider
@@ -68,7 +70,7 @@ object VoiceProviderRegistry {
 private val providerHttpClient = OkHttpClient.Builder().build()
 private const val PROVIDER_TAG = "VoiceProviderNetwork"
 
-private suspend fun getText(url: String): String = withContext(Dispatchers.IO) {
+internal suspend fun getText(url: String): String = withContext(Dispatchers.IO) {
     val endpoint = providerEndpoint(url)
     WeLogger.d(PROVIDER_TAG, "GET start endpoint=$endpoint thread=${Thread.currentThread().name}")
     try {
@@ -377,7 +379,7 @@ object FunBoxShareVoiceProvider : VoiceProvider {
     }
 }
 
-private fun Result<VoiceProviderPage>.logProviderResult(
+internal fun Result<VoiceProviderPage>.logProviderResult(
     provider: String,
     action: String,
     requestedPage: Int,

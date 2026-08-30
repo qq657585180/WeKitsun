@@ -48,6 +48,9 @@ object PanelSettings {
     var onlineStickerSortMode by prefOption("sticker_panel_online_sort_mode", 0)
     var selectedVoiceProvider by prefOption("voice_panel_selected_provider", "funbox_share")
     var selectedEdgeVoice by prefOption("voice_panel_edge_voice", "zh-CN-XiaoxiaoNeural")
+    var tiaxApiKey by prefOption("voice_tiax_apikey", "")
+    var tiaxVoiceIndex by prefOption("voice_tiax_vidx", 0)
+    var voiceDirectoryUrl by prefOption("voice_directory_url", "")
     var funBoxApiClientWxId by prefOption(
         "funbox_api_client_wxid",
         DEFAULT_FUNBOX_API_CLIENT_WXID,

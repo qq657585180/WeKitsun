@@ -1595,6 +1595,8 @@
     <string name="tts_current_voice">Current voice</string>
     <string name="tts_mode_clone">Cloned voice</string>
     <string name="tts_mode_edge">Edge TTS</string>
+    <string name="tts_mode_tiax">tiax Voice</string>
+    <string name="tts_manage_tiax">Manage tiax</string>
     <string name="tts_mode_system">System TTS</string>
     <string name="tts_text_counter">%1$d/%2$d</string>
     <string name="tts_text_label">Text to convert</string>
@@ -1715,6 +1717,18 @@
     <string name="voice_panel_tts_choose_voice_first">Choose a voice first</string>
     <string name="voice_panel_tts_empty">Text to convert cannot be empty</string>
     <string name="voice_panel_tts_too_long">Text to convert cannot exceed %1$d characters</string>
+    <string name="voice_tiax_configure_title">Configure tiax</string>
+    <string name="tiax_apikey_label">API Key</string>
+    <string name="tiax_apikey_placeholder">Your tiax API key</string>
+    <string name="tiax_test_connection">Test connection</string>
+    <string name="tiax_testing">Testing…</string>
+    <string name="tiax_connection_success">Connection successful (%1$s)</string>
+    <string name="tiax_connection_failed">Connection failed: %1$s</string>
+    <string name="tiax_apikey_required">API Key required</string>
+    <string name="voice_directory_url_label">Custom directory URL (JSON)</string>
+    <string name="feature_voice_message_menu_name">Voice Message Menu</string>
+    <string name="feature_voice_message_menu_description">Add "Voice Message" to long-press message menu and chat toolbar</string>
+    <string name="chat_toolbar_voice_message">Voice message</string>
     <string name="voice_panel_upload_voice">Upload voice</string>
     <string name="voice_panel_voice_examples">Voice examples</string>
     <string name="voice_setting_pack_layout">Top-level layout for local and shared voice packs</string>
@@ -2531,6 +2545,7 @@
     <string name="chat_voice_category_invalid">Invalid voice category</string>
     <string name="chat_voice_item_invalid">Invalid voice item</string>
     <string name="chat_voice_download_url_unavailable">No download URL is available</string>
+    <string name="chat_voice_directory_url_unconfigured">No directory URL is configured</string>
     <string name="chat_voice_object_unavailable">No voice object is available</string>
     <string name="chat_voice_category_latest">Latest releases</string>
     <string name="chat_voice_category_recently_updated">Recently updated</string>

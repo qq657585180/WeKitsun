@@ -16,6 +16,7 @@ import dev.ujhhgtg.wekit.features.core.SwitchFeature
 import dev.ujhhgtg.wekit.features.items.chat.panel.CloneExample
 import dev.ujhhgtg.wekit.features.items.chat.panel.CloneVoice
 import dev.ujhhgtg.wekit.features.items.chat.panel.PanelPaths
+import dev.ujhhgtg.wekit.features.items.chat.panel.PanelSettings
 import dev.ujhhgtg.wekit.features.items.chat.panel.PickedPanelFile
 import dev.ujhhgtg.wekit.features.items.chat.panel.VoiceItem
 import dev.ujhhgtg.wekit.features.items.chat.panel.VoicePreview
@@ -27,6 +28,7 @@ import dev.ujhhgtg.wekit.features.items.chat.panel.service.FunBoxCloneVoiceRepos
 import dev.ujhhgtg.wekit.features.items.chat.panel.service.FunBoxServiceClient
 import dev.ujhhgtg.wekit.features.items.chat.panel.service.FunBoxVoiceRepository
 import dev.ujhhgtg.wekit.features.items.chat.panel.voice.CloneVoiceRepository
+import dev.ujhhgtg.wekit.features.items.chat.panel.voice.TIAX_PRESET_VOICES
 import dev.ujhhgtg.wekit.features.items.chat.panel.voice.VoicePanelRepository
 import dev.ujhhgtg.wekit.features.items.chat.panel.voice.VoiceProviderRegistry
 import dev.ujhhgtg.wekit.ui.panel.VoiceImportMode
@@ -35,6 +37,7 @@ import dev.ujhhgtg.wekit.ui.panel.showVoicePanelSheet
 import dev.ujhhgtg.wekit.utils.AudioUtils
 import dev.ujhhgtg.wekit.utils.EdgeTtsClient
 import dev.ujhhgtg.wekit.utils.MediaFileTypeDetector
+import dev.ujhhgtg.wekit.utils.TiaxTtsClient
 import dev.ujhhgtg.wekit.utils.coerceToInt
 import dev.ujhhgtg.wekit.utils.fs.asPath
 import kotlinx.coroutines.CancellationException
@@ -82,6 +85,17 @@ object VoicePanel : SwitchFeature() {
     override val descriptionRes = R.string.feature_voice_panel_description
     fun openPanel(anchor: View) {
         val context = anchor.context
+        showVoicePanelSheet(
+            context = context,
+            actions = buildActions(context),
+        )
+
+        CoroutineScope(Dispatchers.IO).launch {
+            PanelPaths.cleanupStalePanelCache()
+        }
+    }
+
+    fun openPanel(context: Context) {
         showVoicePanelSheet(
             context = context,
             actions = buildActions(context),
@@ -155,6 +169,8 @@ object VoicePanel : SwitchFeature() {
         synthesizeSystem = { text -> synthesizeSystemAndSend(context, WeCurrentConversationApi.value, text) },
         convertEdge = ::synthesizeEdgePreview,
         convertSystem = { text -> synthesizeSystemPreview(context, text) },
+        convertTiax = { text, voiceIndex -> synthesizeTiaxPreview(text, voiceIndex) },
+        synthesizeTiax = { text, voiceIndex -> synthesizeTiaxAndSend(WeCurrentConversationApi.value, text, voiceIndex) },
         loadClones = { withContext(Dispatchers.IO) { CloneVoiceRepository.load() } },
         selectedCloneId = { withContext(Dispatchers.IO) { CloneVoiceRepository.selectedId() } },
         selectClone = { withContext(Dispatchers.IO) { CloneVoiceRepository.select(it) } },
@@ -327,6 +343,16 @@ object VoicePanel : SwitchFeature() {
     private suspend fun synthesizeSystemPreview(context: Context, text: String): Result<VoicePreview> =
         createGeneratedPreview("system-tts", "wav") { path ->
             synthesizeSystemTts(context, text, path.toFile()).getOrThrow()
+        }
+
+    private suspend fun synthesizeTiaxAndSend(talker: String, text: String, voiceIndex: Int): Result<Unit> {
+        val voiceName = TIAX_PRESET_VOICES.getOrNull(voiceIndex)?.name ?: "tiax"
+        return synthesizeAndSend(talker, voiceName) { synthesizeTiaxPreview(text, voiceIndex) }
+    }
+
+    private suspend fun synthesizeTiaxPreview(text: String, voiceIndex: Int): Result<VoicePreview> =
+        createGeneratedPreview("tiax", "mp3") { path ->
+            TiaxTtsClient.synthesizeToMp3(text, path, voiceIndex, PanelSettings.tiaxApiKey).getOrThrow()
         }
 
     private suspend fun synthesizeAndSend(
