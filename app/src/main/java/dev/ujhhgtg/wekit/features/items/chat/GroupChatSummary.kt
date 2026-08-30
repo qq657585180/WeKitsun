@@ -25,13 +25,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Auto_awesome
+import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.features.api.core.WeDatabaseApi
 import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.core.models.MessageType
 import dev.ujhhgtg.wekit.features.api.core.models.WeMessage
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
-import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.core.SwitchFeature
 import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
@@ -49,13 +49,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-@Feature(
-    id = "群聊统计报告",
-    nameRes = "feature_group_chat_summary_name",
-    categoryIds = [FeatureCategoryIds.CHAT],
-    descriptionRes = "feature_group_chat_summary_description",
-)
 object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider {
+
+    override val technicalId = "群聊统计报告"
+    override val nameRes = R.string.feature_group_chat_summary_name
+    override val categoryIds = listOf(FeatureCategoryIds.CHAT)
+    override val descriptionRes = R.string.feature_group_chat_summary_description
 
     private const val GROUP_SUMMARY_MENU_ID = 777029
 

@@ -48,6 +48,7 @@ import com.composables.icons.materialsymbols.outlined.Auto_awesome
 import com.composables.icons.materialsymbols.outlined.Chat
 import com.composables.icons.materialsymbols.outlined.Close
 import com.composables.icons.materialsymbols.outlined.Settings
+import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.agent.data.entity.ModelEntity
 import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderEntity
 import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderType
@@ -60,7 +61,6 @@ import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
 import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.core.models.MessageType
 import dev.ujhhgtg.wekit.features.api.ui.WeChatMessageContextMenuApi
-import dev.ujhhgtg.wekit.features.core.Feature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.core.SwitchFeature
 import dev.ujhhgtg.wekit.preferences.WePrefs
@@ -76,13 +76,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@Feature(
-    id = "AI回复",
-    nameRes = "feature_ai_reply_name",
-    categoryIds = [FeatureCategoryIds.CHAT],
-    descriptionRes = "feature_ai_reply_description",
-)
 object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider {
+
+    override val technicalId = "AI回复"
+    override val nameRes = R.string.feature_ai_reply_name
+    override val categoryIds = listOf(FeatureCategoryIds.CHAT)
+    override val descriptionRes = R.string.feature_ai_reply_description
 
     private const val AI_REPLY_MENU_ID = 777028
 
@@ -542,7 +541,7 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
     @Composable
     private fun ModelConfigPanel(onBack: () -> Unit) {
         val scope = rememberCoroutineScope()
-        val remoteTypes = REMOTE_PROVIDER_TYPES
+        val remoteTypes = RemoteProviderTypes.REMOTE_PROVIDER_TYPES
         var selectedType by remember { mutableStateOf(ModelConfig.providerType()) }
         var baseUrl by remember { mutableStateOf(ModelConfig.baseUrl) }
         var apiKey by remember { mutableStateOf(ModelConfig.apiKey) }
@@ -817,7 +816,7 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         return text.lines().map { it.trim() }.filter { it.isNotBlank() }
     }
 
-    private companion object {
+    private object RemoteProviderTypes {
         val REMOTE_PROVIDER_TYPES =
             ModelProviderType.entries.filterNot { it == ModelProviderType.LOCAL_LLAMA }
     }

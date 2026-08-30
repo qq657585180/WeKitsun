@@ -32,8 +32,8 @@ object VoiceMessageMenu : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
             drawable = VoiceMessageIcon(),
             imageVector = MaterialSymbols.Outlined.Volume_up,
             isSupported = { true },
-        ) { _, context, _ ->
-            VoicePanel.openPanel(context)
+        ) { view, _, _ ->
+            VoicePanel.openPanel(view)
         },
     )
 }
