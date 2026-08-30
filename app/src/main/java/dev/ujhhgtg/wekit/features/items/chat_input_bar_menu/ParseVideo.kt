@@ -52,6 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -112,8 +113,18 @@ object ParseVideo : SwitchFeature() {
     private data class VideoParseResult(
         val code: Int,
         val msg: String,
-        val data: VideoData?,
-    )
+        val data: JsonElement?,
+    ) {
+        /** 把 data(JsonElement) 解析成 VideoData 对象，兼容 data 为字符串(错误信息)的情况 */
+        fun parsedData(): VideoData? {
+            if (code != 200) return null
+            val element = data ?: return null
+            if (element !is kotlinx.serialization.json.JsonObject) return null
+            return runCatching {
+                json.decodeFromJsonElement<VideoData>(element)
+            }.getOrNull()
+        }
+    }
 
     @Serializable
     private data class VideoData(
@@ -198,7 +209,7 @@ fun showParseDialog(context: android.content.Context) {
                     loading = false
                     parsed.fold(
                         onSuccess = { r ->
-                            if (r.code != 200 || r.data?.video_link.isNullOrBlank()) {
+                            if (r.code != 200 || r.parsedData()?.video_link.isNullOrBlank()) {
                                 errorMsg = r.msg.ifBlank { localizedChatInputString(R.string.parse_video_api_error) }
                                 return@fold
                             }
@@ -213,7 +224,7 @@ fun showParseDialog(context: android.content.Context) {
             }
 
             fun doDownload() {
-                val data = parseResult?.data ?: return
+                val data = parseResult?.parsedData() ?: return
                 downloading = true
                 errorMsg = null
                 scope.launch {
@@ -255,7 +266,7 @@ fun showParseDialog(context: android.content.Context) {
             }
 
             fun copyDirectLink() {
-                val data = parseResult?.data ?: return
+                val data = parseResult?.parsedData() ?: return
                 runCatching { copyToClipboard(appContext, data.video_link) }
                 showToast(localizedChatInputString(R.string.parse_video_copied))
             }
@@ -269,7 +280,7 @@ fun showParseDialog(context: android.content.Context) {
             }
 
             fun extractMusic() {
-                val data = parseResult?.data ?: return
+                val data = parseResult?.parsedData() ?: return
                 if (extractingMusic) return
                 extractingMusic = true
                 errorMsg = null
@@ -406,7 +417,7 @@ fun showParseDialog(context: android.content.Context) {
 
                         // ===== 解析结果信息 =====
                         parseResult?.let { r ->
-                            val data = r.data ?: return@let
+                            val data = r.parsedData() ?: return@let
                             Spacer(Modifier.height(8.dp))
                             HorizontalDivider(Modifier.padding(vertical = 4.dp))
                             Column {
@@ -509,7 +520,7 @@ fun showParseDialog(context: android.content.Context) {
                 },
                 confirmButton = {
                     // ===== 按钮组 =====
-                    val data = parseResult?.data
+                    val data = parseResult?.parsedData()
                     if (data == null) {
                         Button(
                             onClick = { doParse() },
