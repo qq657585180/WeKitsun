@@ -108,6 +108,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.io.path.div
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.fileSize
 import kotlin.time.Duration.Companion.milliseconds
@@ -3110,6 +3111,11 @@ private fun TiaxConfigurePage(onDismiss: () -> Unit) {
     var testing by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
 
+    val apiKeyRequiredText = stringResource(R.string.tiax_apikey_required)
+    val connectionSuccessText = stringResource(R.string.tiax_connection_success)
+    val connectionFailedText = stringResource(R.string.tiax_connection_failed)
+    val testingText = stringResource(R.string.tiax_testing)
+
     PanelPageOverlay(onDismiss = onDismiss, onBack = onDismiss) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onDismiss) {
@@ -3151,7 +3157,7 @@ private fun TiaxConfigurePage(onDismiss: () -> Unit) {
                 onClick = {
                     val key = PanelSettings.tiaxApiKey
                     if (key.isBlank()) {
-                        testResult = false to stringResource(R.string.tiax_apikey_required)
+                        testResult = false to apiKeyRequiredText
                         return@OutlinedButton
                     }
                     testing = true
@@ -3166,8 +3172,8 @@ private fun TiaxConfigurePage(onDismiss: () -> Unit) {
                         }
                         testing = false
                         testResult = result.fold(
-                            onSuccess = { size -> true to stringResource(R.string.tiax_connection_success, "$size B") },
-                            onFailure = { error -> false to stringResource(R.string.tiax_connection_failed, error.message ?: "unknown") },
+                            onSuccess = { size -> true to String.format(connectionSuccessText, "$size B") },
+                            onFailure = { error -> false to String.format(connectionFailedText, error.message ?: "unknown") },
                         )
                     }
                 },
@@ -3175,7 +3181,7 @@ private fun TiaxConfigurePage(onDismiss: () -> Unit) {
                 modifier = Modifier.weight(1f),
             ) {
                 Text(
-                    if (testing) stringResource(R.string.tiax_testing)
+                    if (testing) testingText
                     else stringResource(R.string.tiax_test_connection),
                 )
             }
