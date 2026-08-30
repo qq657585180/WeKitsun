@@ -1,7 +1,6 @@
 package dev.ujhhgtg.wekit.features.items.chat_input_bar_menu
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -47,7 +46,6 @@ import dev.ujhhgtg.wekit.utils.android.showToast
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.div
 import dev.ujhhgtg.wekit.utils.fs.KnownPaths
-import dev.ujhhgtg.wekit.utils.fs.createDirsSafe
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -121,7 +119,7 @@ object ParseVideo : SwitchFeature() {
             val element = data ?: return null
             if (element !is kotlinx.serialization.json.JsonObject) return null
             return runCatching {
-                json.decodeFromJsonElement<VideoData>(element)
+                json.decodeFromString<VideoData>(element.toString())
             }.getOrNull()
         }
     }
