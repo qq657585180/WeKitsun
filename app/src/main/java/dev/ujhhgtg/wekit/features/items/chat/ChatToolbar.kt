@@ -80,6 +80,7 @@ import com.composables.icons.materialsymbols.outlined.Redeem
 import com.composables.icons.materialsymbols.outlined.Settings
 import com.composables.icons.materialsymbols.outlined.Smart_toy
 import com.composables.icons.materialsymbols.outlined.Video_chat
+import com.composables.icons.materialsymbols.outlined.Video_file
 import com.composables.icons.materialsymbols.outlined.Voice_chat
 import com.composables.icons.materialsymbols.outlined.Volume_up
 import com.tencent.mm.pluginsdk.ui.chat.AppPanel
@@ -96,6 +97,8 @@ import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
 import dev.ujhhgtg.wekit.features.core.ClickableFeature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.features.items.system.agent.WeAgentOverlayController
+import dev.ujhhgtg.wekit.features.items.chat.VoicePanel
+import dev.ujhhgtg.wekit.features.items.chat_input_bar_menu.ParseVideo
 import dev.ujhhgtg.wekit.preferences.WePrefs
 import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
 import dev.ujhhgtg.wekit.ui.content.Button
@@ -169,6 +172,7 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
     private const val QUICK_REPLY_NAME = "快捷回复"
     private const val WEAGENT_NAME = "WeAgent"
     private const val VOICE_MESSAGE_NAME = "语音消息"
+    private const val VIDEO_PARSE_NAME = "视频解析"
 
     private val methodAppPanelInitAppGrid by dexMethod {
         matcher {
@@ -282,7 +286,7 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
     }
 
     private var itemsOrder by WePrefs.prefOption("chat_toolbar_order", NAME_TO_ICON_MAP.keys.joinToString(","))
-    private var enabledItems by WePrefs.prefOption("chat_toolbar_enabled_items", NAME_TO_ICON_MAP.keys)
+    private var enabledItems by WePrefs.prefOption("chat_toolbar_enabled_items", (NAME_TO_ICON_MAP.keys + setOf(VIDEO_PARSE_NAME)))
     private var displayModeValue by WePrefs.prefOption(
         "chat_toolbar_display_mode",
         ToolbarDisplayMode.ICON_AND_TEXT.preferenceValue,
@@ -312,6 +316,7 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
         QUICK_REPLY_NAME -> MaterialSymbols.Outlined.Chat
         WEAGENT_NAME -> MaterialSymbols.Outlined.Smart_toy
         VOICE_MESSAGE_NAME -> MaterialSymbols.Outlined.Volume_up
+        VIDEO_PARSE_NAME -> MaterialSymbols.Outlined.Video_file
         else -> NAME_TO_ICON_MAP.getValue(name)
     }
 
@@ -339,6 +344,7 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
         QUICK_REPLY_NAME -> R.string.chat_toolbar_quick_reply
         WEAGENT_NAME -> R.string.feature_we_agent_name
         VOICE_MESSAGE_NAME -> R.string.chat_toolbar_voice_message
+        VIDEO_PARSE_NAME -> R.string.feature_parse_video_name
         else -> error("unsupported toolbar item: $name")
     }
 
@@ -346,11 +352,12 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
     // configs that predate quick replies get that item inserted first, and ones that predate the
     // WeAgent entry get it inserted right before 快捷回复.
     private fun normalizeOrder(order: List<String>): List<String> {
-        val supportedItems = setOf(QUICK_REPLY_NAME, WEAGENT_NAME, VOICE_MESSAGE_NAME) + NAME_TO_ICON_MAP.keys
+        val supportedItems = setOf(QUICK_REPLY_NAME, WEAGENT_NAME, VOICE_MESSAGE_NAME, VIDEO_PARSE_NAME) + NAME_TO_ICON_MAP.keys
         val result = order.filter { it in supportedItems }.distinct().toMutableList()
         if (QUICK_REPLY_NAME !in result) result.add(0, QUICK_REPLY_NAME)
         if (WEAGENT_NAME !in result) result.add(result.indexOf(QUICK_REPLY_NAME), WEAGENT_NAME)
         if (VOICE_MESSAGE_NAME !in result) result.add(result.indexOf(WEAGENT_NAME).takeIf { it >= 0 } ?: result.indexOf(QUICK_REPLY_NAME) + 1, VOICE_MESSAGE_NAME)
+        if (VIDEO_PARSE_NAME !in result) result.add(result.indexOf(WEAGENT_NAME) + 1, VIDEO_PARSE_NAME)
         NAME_TO_ICON_MAP.keys.forEach { if (it !in result) result.add(it) }
         return result
     }
@@ -553,6 +560,10 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
 
                             list.add(VOICE_MESSAGE_NAME to {
                                 VoicePanel.openPanel(activity)
+                            })
+
+                            list.add(VIDEO_PARSE_NAME to {
+                                showVideoParsePicker(activity)
                             })
 
                             list.add(QUICK_REPLY_NAME to {
@@ -763,6 +774,10 @@ object ChatToolbar : ClickableFeature(), IResolveDex {
     }
 
     // shown when the user taps the 快捷回复 chip in the chat toolbar: pick a reply to insert
+    private fun showVideoParsePicker(context: Context) {
+        ParseVideo.showParseDialog(context)
+    }
+
     private fun showQuickReplyPicker(context: Context) {
         showComposeDialog(context) {
             val replies = remember { loadQuickReplies() }

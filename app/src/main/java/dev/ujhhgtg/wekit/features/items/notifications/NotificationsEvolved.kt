@@ -48,6 +48,7 @@ import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import dev.ujhhgtg.wekit.utils.HostInfo
 import dev.ujhhgtg.wekit.utils.TargetProcesses
 import dev.ujhhgtg.wekit.utils.WeLogger
+import dev.ujhhgtg.wekit.utils.hookBeforeDirectly
 import dev.ujhhgtg.wekit.utils.android.getSystemService
 import dev.ujhhgtg.wekit.utils.collections.LruCache
 import dev.ujhhgtg.wekit.utils.fs.KnownPaths
@@ -194,6 +195,10 @@ object NotificationsEvolved : ClickableFeature(), IResolveDex {
     private val avatarLock = Any()
     private val avatarCache = LruCache<String, CachedAvatar>(maxLimit = 64)
     private val notificationContext = ThreadLocal<NotificationContext?>()
+    // 合并同一会话多条通知：微信原始 notify id -> convWxId 映射，
+    // 已读时微信用原 id cancel，需映射回合并 id 才能取消并清空 history。
+    private val currentTalker = ThreadLocal<String?>()
+    private val notifyIdMap = HashMap<Int, String>()
     private lateinit var mediaScope: CoroutineScope
     private val notificationMediaDir by lazy {
         (KnownPaths.moduleCache / "notification-media").createDirsSafe()
@@ -706,6 +711,7 @@ object NotificationsEvolved : ClickableFeature(), IResolveDex {
         // x.d -> m0.a -> e0.b -> Notification.Builder.build() all run synchronously on this
         // thread, so the raw dealNotify content identifies the message consumed by build().
         methodDealNotify.hookBefore {
+            currentTalker.set(args[1] as? String)
             notificationContext.set(
                 NotificationContext(
                     talker = args[1] as String,
@@ -716,6 +722,7 @@ object NotificationsEvolved : ClickableFeature(), IResolveDex {
         methodDealNotify.hookAfter {
             notificationContext.get()?.let(::discardPendingMessage)
             notificationContext.remove()
+            currentTalker.remove()
         }
 
         // WeChat calls ConversationStorage.updateUnreadByTalker(talker) when a conversation's
@@ -907,11 +914,94 @@ object NotificationsEvolved : ClickableFeature(), IResolveDex {
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
         receiverRegistered = true
+
+        hookNotifyIdMerge()
+    }
+
+    // ==================== 通知合并：同一会话的通知 id 统一为会话哈希 ====================
+    private fun hookNotifyIdMerge() {
+        val notifCls = Notification::class.java
+        val nmCls = NotificationManager::class.java
+        runCatching {
+            nmCls.getMethod("notify", Int::class.javaPrimitiveType, notifCls)
+                .hookBeforeDirectly {
+                    val convWxId = currentTalker.get()
+                    if (convWxId != null) {
+                        val n = args[1] as? Notification
+                        if (n != null && n.channelId == "message_channel_new_id") {
+                            val origId = args[0] as Int
+                            args[0] = convWxId.hashCode()
+                            recordNotifyId(origId, convWxId)
+                        }
+                        currentTalker.remove()
+                    }
+                }
+            WeLogger.i(TAG, "notify(int,Notification) merge hook registered")
+        }.onFailure { WeLogger.w(TAG, "hook notify(int) merge failed", it) }
+        runCatching {
+            nmCls.getMethod("notify", String::class.java, Int::class.javaPrimitiveType, notifCls)
+                .hookBeforeDirectly {
+                    val convWxId = currentTalker.get()
+                    if (convWxId != null) {
+                        val n = args[2] as? Notification
+                        if (n != null && n.channelId == "message_channel_new_id") {
+                            val origId = args[1] as Int
+                            args[1] = convWxId.hashCode()
+                            recordNotifyId(origId, convWxId)
+                        }
+                    }
+                    currentTalker.remove()
+                }
+            WeLogger.i(TAG, "notify(tag,int,Notification) merge hook registered")
+        }.onFailure { WeLogger.w(TAG, "hook notify(tag,int) merge failed", it) }
+
+        // 微信已读/清理通知：把原始 id 转换回合并后的 id 才能真正取消，
+        // 并清空该会话 history，避免已读消息在下一条通知里被带出。
+        runCatching {
+            nmCls.getMethod("cancel", Int::class.javaPrimitiveType)
+                .hookBeforeDirectly {
+                    val origId = args[0] as Int
+                    synchronized(notifyIdMap) {
+                        val convWxId = notifyIdMap.remove(origId)
+                        if (convWxId != null) {
+                            clearConversationState(convWxId)
+                            pendingContentIntents.remove(convWxId)
+                            args[0] = convWxId.hashCode()
+                            WeLogger.i(TAG, "wechat cancelled notif for $convWxId (merged id)")
+                        }
+                    }
+                }
+            WeLogger.i(TAG, "cancel(int) merge hook registered")
+        }.onFailure { WeLogger.w(TAG, "hook cancel(int) merge failed", it) }
+        runCatching {
+            nmCls.getMethod("cancel", String::class.java, Int::class.javaPrimitiveType)
+                .hookBeforeDirectly {
+                    val origId = args[1] as Int
+                    synchronized(notifyIdMap) {
+                        val convWxId = notifyIdMap.remove(origId)
+                        if (convWxId != null) {
+                            clearConversationState(convWxId)
+                            pendingContentIntents.remove(convWxId)
+                            args[1] = convWxId.hashCode()
+                            WeLogger.i(TAG, "wechat cancelled notif(tag) for $convWxId (merged id)")
+                        }
+                    }
+                }
+            WeLogger.i(TAG, "cancel(tag,int) merge hook registered")
+        }.onFailure { WeLogger.w(TAG, "hook cancel(tag,int) merge failed", it) }
+    }
+
+    private fun recordNotifyId(origId: Int, convWxId: String) {
+        synchronized(notifyIdMap) {
+            if (notifyIdMap.size >= 128) notifyIdMap.clear()
+            notifyIdMap[origId] = convWxId
+        }
     }
 
     override fun onDisable() {
         if (::mediaScope.isInitialized) mediaScope.cancel()
         clearState()
+        synchronized(notifyIdMap) { notifyIdMap.clear() }
         if (!receiverRegistered) return
         receiverRegistered = false
         runCatching { HostInfo.application.unregisterReceiver(notificationReceiver) }

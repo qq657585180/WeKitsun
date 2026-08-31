@@ -51,6 +51,8 @@ import com.composables.icons.materialsymbols.outlined.Settings
 import dev.ujhhgtg.wekit.R
 import dev.ujhhgtg.wekit.agent.data.entity.ModelEntity
 import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderEntity
+import dev.ujhhgtg.wekit.agent.data.WeAgentSettings
+import dev.ujhhgtg.wekit.agent.data.WeAgentRepository
 import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderType
 import dev.ujhhgtg.wekit.agent.model.LlmMessage
 import dev.ujhhgtg.wekit.agent.model.LlmRole
@@ -77,7 +79,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider {
-
     override val technicalId = "AI回复"
     override val nameRes = R.string.feature_ai_reply_name
     override val categoryIds = listOf(FeatureCategoryIds.CHAT)
@@ -102,26 +103,6 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         val name: String,
         val description: String,
     )
-
-    /**
-     * AI 回复的独立模型配置，与 WeAgent 的模型数据库解耦，直接持久化到 MMKV。
-     */
-    private object ModelConfig {
-        var providerTypeName by WePrefs.prefOption(
-            "ai_reply_provider_type",
-            ModelProviderType.OPENAI_CHAT_COMPLETION.name,
-        )
-        var baseUrl by WePrefs.prefOption("ai_reply_base_url", "")
-        var apiKey by WePrefs.prefOption("ai_reply_api_key", "")
-        var modelId by WePrefs.prefOption("ai_reply_model_id", "")
-
-        fun providerType(): ModelProviderType =
-            runCatching { ModelProviderType.valueOf(providerTypeName) }
-                .getOrDefault(ModelProviderType.OPENAI_CHAT_COMPLETION)
-
-        fun isConfigured(): Boolean =
-            baseUrl.isNotBlank() && apiKey.isNotBlank() && modelId.isNotBlank()
-    }
 
     override fun onEnable() {
         WeChatMessageContextMenuApi.addProvider(this)
@@ -165,8 +146,6 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         talker: String,
         onDismiss: () -> Unit,
     ) {
-        val context = LocalContext.current
-
         Surface(
             shape = RoundedCornerShape(24.dp),
             color = MaterialTheme.colorScheme.surface,
@@ -177,18 +156,6 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
                 messageContent = messageContent,
                 talker = talker,
                 onDismiss = onDismiss,
-                onOpenConfig = {
-                    showComposeDialog(context, directlyDismissable = false) {
-                        Surface(
-                            shape = RoundedCornerShape(24.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 6.dp,
-                            modifier = Modifier.fillMaxWidth(0.92f),
-                        ) {
-                            ModelConfigPanel(onBack = onDismiss)
-                        }
-                    }
-                },
             )
         }
     }
@@ -199,7 +166,6 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         messageContent: String,
         talker: String,
         onDismiss: () -> Unit,
-        onOpenConfig: () -> Unit,
     ) {
         var replies by remember { mutableStateOf<List<String>>(emptyList()) }
         var isLoading by remember { mutableStateOf(false) }
@@ -213,11 +179,6 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         val scope = rememberCoroutineScope()
 
         fun runGenerate() {
-            if (!ModelConfig.isConfigured()) {
-                errorMessage = "未配置 AI 模型，请先点击右上角设置"
-                onOpenConfig()
-                return
-            }
             isLoading = true
             errorMessage = null
             scope.launch {
@@ -264,19 +225,11 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onOpenConfig) {
-                        Icon(
-                            imageVector = MaterialSymbols.Outlined.Settings,
-                            contentDescription = "AI 模型与接口配置",
-                        )
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = MaterialSymbols.Outlined.Close,
-                            contentDescription = "关闭",
-                        )
-                    }
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = MaterialSymbols.Outlined.Close,
+                        contentDescription = "关闭",
+                    )
                 }
             }
 
@@ -538,172 +491,6 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         )
     }
 
-    @Composable
-    private fun ModelConfigPanel(onBack: () -> Unit) {
-        val scope = rememberCoroutineScope()
-        val remoteTypes = RemoteProviderTypes.REMOTE_PROVIDER_TYPES
-        var selectedType by remember { mutableStateOf(ModelConfig.providerType()) }
-        var baseUrl by remember { mutableStateOf(ModelConfig.baseUrl) }
-        var apiKey by remember { mutableStateOf(ModelConfig.apiKey) }
-        var modelId by remember { mutableStateOf(ModelConfig.modelId) }
-        var testing by remember { mutableStateOf(false) }
-
-        fun runTestConnection() {
-            val url = baseUrl.trim()
-            val key = apiKey.trim()
-            if (url.isBlank()) {
-                showToast("请先填写 API 地址")
-                return
-            }
-            if (key.isBlank()) {
-                showToast("请先填写 API Key")
-                return
-            }
-            testing = true
-            scope.launch {
-                val provider = ModelProviderEntity(
-                    id = "ai_reply",
-                    type = selectedType,
-                    name = "AI回复",
-                    baseUrl = url,
-                    apiKey = key,
-                )
-                val result = ModelProviderManager.listRemoteModels(provider)
-                testing = false
-                result.fold(
-                    onSuccess = { models ->
-                        if (models.isEmpty()) {
-                            showToast("连接成功，但未获取到可用模型")
-                        } else {
-                            showToast("连接成功，获取到 ${models.size} 个模型")
-                        }
-                    },
-                    onFailure = { showToast("连接失败：${it.message}") },
-                )
-            }
-        }
-
-        Column(
-            modifier = Modifier
-                .padding(20.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "AI 模型与接口配置",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                )
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = MaterialSymbols.Outlined.Close,
-                        contentDescription = "返回",
-                    )
-                }
-            }
-
-            HorizontalDivider()
-
-            DropDownMenuWidget(
-                icon = null,
-                iconPlaceholder = false,
-                title = "接口类型",
-                description = null,
-                value = selectedType,
-                options = remoteTypes.map { DropdownOption(it, it.label()) },
-                onValueChange = { selectedType = it },
-            )
-
-            OutlinedTextField(
-                value = baseUrl,
-                onValueChange = { baseUrl = it },
-                label = { Text("API 地址 (Base URL)") },
-                placeholder = {
-                    Text(
-                        "https://api.openai.com/v1",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodyMedium,
-                singleLine = true,
-            )
-
-            OutlinedTextField(
-                value = apiKey,
-                onValueChange = { apiKey = it },
-                label = { Text("API Key") },
-                placeholder = {
-                    Text(
-                        "sk-...",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodyMedium,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                visualTransformation = PasswordVisualTransformation(),
-            )
-
-            Button(
-                onClick = { runTestConnection() },
-                enabled = !testing,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (testing) {
-                    Text("正在测试连接...")
-                } else {
-                    Text("测试连接")
-                }
-            }
-
-            OutlinedTextField(
-                value = modelId,
-                onValueChange = { modelId = it },
-                label = { Text("模型 ID") },
-                placeholder = {
-                    Text(
-                        "gpt-4o-mini",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                },
-                modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodyMedium,
-                singleLine = true,
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                TextButton(
-                    onClick = onBack,
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("取消")
-                }
-                Button(
-                    onClick = {
-                        ModelConfig.providerTypeName = selectedType.name
-                        ModelConfig.baseUrl = baseUrl.trim()
-                        ModelConfig.apiKey = apiKey.trim()
-                        ModelConfig.modelId = modelId.trim()
-                        onBack()
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Text("保存")
-                }
-            }
-        }
-    }
-
     private suspend fun generateReplies(
         messageContent: String,
         talker: String,
@@ -713,25 +500,13 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         customPrompt: String,
     ): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
-            check(ModelConfig.baseUrl.isNotBlank()) { "未配置 API 地址，请先点击右上角设置" }
-            check(ModelConfig.apiKey.isNotBlank()) { "未配置 API Key，请先点击右上角设置" }
-            check(ModelConfig.modelId.isNotBlank()) { "未配置模型 ID，请先点击右上角设置" }
-
-            val provider = ModelProviderEntity(
-                id = "ai_reply",
-                type = ModelConfig.providerType(),
-                name = "AI回复",
-                baseUrl = ModelConfig.baseUrl.trim(),
-                apiKey = ModelConfig.apiKey.trim(),
-            )
-            val model = ModelEntity(
-                id = "ai_reply_model",
-                providerId = provider.id,
-                modelIdRemote = ModelConfig.modelId.trim(),
-                reasoningEffort = null,
-                customJsonOverride = null,
-                displayName = ModelConfig.modelId.trim(),
-            )
+            val modelId = WeAgentSettings.defaultModelId()
+                ?: WeAgentRepository.firstModelId()
+                ?: throw IllegalStateException("未配置AI模型，请先在WeAgent设置中添加模型")
+            val model = WeAgentRepository.getModel(modelId)
+                ?: throw IllegalStateException("未找到模型: $modelId")
+            val provider = WeAgentRepository.getModelProvider(model.providerId)
+                ?: throw IllegalStateException("未找到模型提供者: ${model.providerId}")
             val client = ModelProviderManager.clientFor(provider)
 
             val contextText = if (contextCount > 0) {
@@ -816,10 +591,8 @@ object AiReply : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider
         return text.lines().map { it.trim() }.filter { it.isNotBlank() }
     }
 
-    private object RemoteProviderTypes {
-        val REMOTE_PROVIDER_TYPES =
-            ModelProviderType.entries.filterNot { it == ModelProviderType.LOCAL_LLAMA }
-    }
+    private val REMOTE_PROVIDER_TYPES =
+        ModelProviderType.entries.filterNot { it == ModelProviderType.LOCAL_LLAMA }
 }
 
 private class AiReplyIcon : VectorPathDrawable(

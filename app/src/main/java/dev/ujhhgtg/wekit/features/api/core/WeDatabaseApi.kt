@@ -260,16 +260,6 @@ object WeDatabaseApi : ApiFeature(), IResolveDex {
             LIMIT $limit OFFSET $offset
         """.trimIndent()
 
-        /** 按时间范围获取消息 */
-        fun messagesInRange(wxid: String, startTime: Long, endTime: Long) = """
-            SELECT msgId, msgSvrId, talker, content, type, createTime, isSend
-            FROM message
-            WHERE talker='$wxid'
-              AND createTime >= $startTime
-              AND createTime < $endTime
-            ORDER BY createTime ASC
-        """.trimIndent()
-
         /**
          * 获取指定会话中特定发送者的消息
          * 支持群聊（通过 content 匹配对方，或通过 isSend 匹配自己）与单聊
@@ -693,14 +683,18 @@ object WeDatabaseApi : ApiFeature(), IResolveDex {
     }
 
     /**
-     * 获取指定时间范围内的【消息】（按时间升序）
+     * 获取指定时间段内的消息
      * @param convId 会话 ID
-     * @param startTime 起始时间（毫秒时间戳，含）
-     * @param endTime 结束时间（毫秒时间戳，不含）
+     * @param startTime 起始时间戳 (ms)
+     * @param endTime 结束时间戳 (ms)
      */
     fun getMessagesInRange(convId: String, startTime: Long, endTime: Long): List<WeMessage> {
         if (convId.isEmpty()) return emptyList()
-        return executeQuery(SqlStatements.messagesInRange(convId, startTime, endTime)).map { row ->
+        val sql = """
+            SELECT * FROM message WHERE talker = ? AND createTime BETWEEN ? AND ?
+            ORDER BY createTime ASC
+        """.trimIndent()
+        return executeQuery(sql, arrayOf(convId, startTime, endTime)).map { row ->
             WeMessage(
                 msgId = row.long("msgId"),
                 msgSvrId = row.long("msgSvrId"),
@@ -718,8 +712,7 @@ object WeDatabaseApi : ApiFeature(), IResolveDex {
      * @param convId 会话 ID（单聊为对方 wxid，群聊为 xxx@chatroom）
      * @param senderId 发送者 ID（wxid）
      */
-    fun getMessagesFromSender(
-        convId: String,
+    fun getMessagesFromSender(        convId: String,
         senderId: String,
     ): List<WeMessage> {
         if (convId.isEmpty() || senderId.isEmpty()) return emptyList()
