@@ -2,7 +2,18 @@ package dev.ujhhgtg.wekit.features.items.chat
 import dev.ujhhgtg.wekit.R
 
 import android.view.View
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.Column
@@ -11,7 +22,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -26,12 +39,12 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Auto_awesome
 import dev.ujhhgtg.wekit.agent.data.entity.ModelEntity
 import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderEntity
-import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderType
 import dev.ujhhgtg.wekit.agent.model.LlmMessage
 import dev.ujhhgtg.wekit.agent.model.LlmRole
 import dev.ujhhgtg.wekit.agent.model.LlmStreamEvent
@@ -55,9 +68,28 @@ import dev.ujhhgtg.wekit.utils.strings.isGroupChatWxId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+
+data class GroupChatReportData(
+    val groupName: String,
+    val totalCount: Int,
+    val activeSpeakers: Int,
+    val textCount: Int,
+    val typeCounts: Map<String, Int>,
+    val timeSlots: List<TimeSlotData>,
+    val emotions: List<EmotionData>,
+    val aiInsight: String?,
+)
+
+data class TimeSlotData(
+    val label: String,
+    val tag: String,
+    val count: Int,
+)
+
+data class EmotionData(
+    val name: String,
+    val percent: Int,
+)
 
 object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItemsProvider {
     override val technicalId = "群聊统计报告"
@@ -106,7 +138,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
         talker: String,
         onDismiss: () -> Unit,
     ) {
-        var report by remember { mutableStateOf<String?>(null) }
+        var report by remember { mutableStateOf<GroupChatReportData?>(null) }
         var isLoading by remember { mutableStateOf(false) }
         var errorMessage by remember { mutableStateOf<String?>(null) }
         var messageCount by remember { mutableIntStateOf(500) }
@@ -211,24 +243,18 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                         )
                     }
 
-                    report?.let { result ->
-                        Text(
-                            text = stringResource(R.string.ui_group_result),
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                            modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
-                        )
-                        Text(
-                            text = result,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 4.dp),
-                        )
+                    report?.let { data ->
+                        ReportHero(data)
+                        DonutPanel(data.typeCounts)
+                        MetricStrip(data)
+                        TimeBars(data.timeSlots)
+                        EmotionGauges(data.emotions)
+                        InsightPanel(data.aiInsight)
                         Text(
                             text = stringResource(R.string.ui_tip_ai_only),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(top = 4.dp),
                         )
                     }
                 }
@@ -238,7 +264,7 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                     Button(
                         onClick = {
                             scope.launch {
-                                val reportText = report
+                                val reportText = report?.let { it.aiInsight ?: it.toStatsText() }
                                 if (reportText != null && WeMessageApi.sendText(talker, reportText)) {
                                     showToast("已发送报告")
                                     onDismiss()
@@ -292,8 +318,11 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                         }
                         TextButton(
                             onClick = {
-                                copyToClipboard(report!!)
-                                showToast("已复制报告内容")
+                                val text = report?.let { it.aiInsight ?: it.toStatsText() }
+                                if (text != null) {
+                                    copyToClipboard(text)
+                                    showToast("已复制报告内容")
+                                }
                             },
                         ) {
                             Text(stringResource(R.string.btn_copy))
@@ -308,11 +337,363 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
         )
     }
 
+    @Composable
+    private fun SectionTitle(title: String) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp, bottom = 6.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(width = 4.dp, height = 14.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(MaterialTheme.colorScheme.primary),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+
+    @Composable
+    private fun ReportHero(data: GroupChatReportData) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            MaterialTheme.colorScheme.primary,
+                            MaterialTheme.colorScheme.tertiary,
+                        ),
+                    ),
+                )
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+        ) {
+            Column {
+                Text(
+                    text = "分析报告",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = data.groupName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.9f),
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = "今日 · ${data.totalCount} 条消息",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.7f),
+                )
+            }
+        }
+    }
+
+    @Composable
+    private fun DonutPanel(typeCounts: Map<String, Int>) {
+        val palette = listOf(
+            MaterialTheme.colorScheme.primary,
+            MaterialTheme.colorScheme.tertiary,
+            MaterialTheme.colorScheme.secondary,
+            MaterialTheme.colorScheme.error,
+            MaterialTheme.colorScheme.surfaceVariant,
+        )
+        val ordered = listOf("文本", "图片", "语音", "视频", "表情", "文件/链接")
+            .mapNotNull { key -> typeCounts[key]?.let { key to it } }
+            .filter { it.second > 0 }
+
+        SectionTitle("消息结构")
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(112.dp)
+                    .padding(6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                val total = ordered.sumOf { it.second }
+                if (total > 0) {
+                    Canvas(Modifier.matchParentSize()) {
+                        val strokeWidth = size.minDimension * 0.16f
+                        val arcSize = Size(
+                            width = size.width - strokeWidth,
+                            height = size.height - strokeWidth,
+                        )
+                        val topLeft = Offset(
+                            x = (size.width - arcSize.width) / 2f,
+                            y = (size.height - arcSize.height) / 2f,
+                        )
+                        var startAngle = -90f
+                        ordered.forEachIndexed { index, (_, count) ->
+                            val sweep = count.toFloat() / total * 360f
+                            drawArc(
+                                color = palette[index % palette.size],
+                                startAngle = startAngle,
+                                sweepAngle = sweep - 1f,
+                                useCenter = false,
+                                topLeft = topLeft,
+                                size = arcSize,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Butt),
+                            )
+                            startAngle += sweep
+                        }
+                    }
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = total.toString(),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Text(
+                        text = "总消息",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                ordered.forEachIndexed { index, (key, count) ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .clip(CircleShape)
+                                .background(palette[index % palette.size]),
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = key,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = "$count 条",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun MetricStrip(data: GroupChatReportData) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .padding(vertical = 12.dp),
+        ) {
+            MetricCell(Modifier.weight(1f), data.totalCount, "消息")
+            MetricDivider()
+            MetricCell(Modifier.weight(1f), data.activeSpeakers, "发言者")
+            MetricDivider()
+            MetricCell(Modifier.weight(1f), data.textCount, "文本")
+        }
+    }
+
+    @Composable
+    private fun MetricCell(
+        modifier: Modifier,
+        value: Int,
+        label: String,
+    ) {
+        Column(
+            modifier = modifier,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = value.toString(),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+
+    @Composable
+    private fun MetricDivider() {
+        Box(
+            modifier = Modifier
+                .width(1.dp)
+                .height(28.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant),
+        )
+    }
+
+    @Composable
+    private fun TimeBars(slots: List<TimeSlotData>) {
+        SectionTitle("时段活跃")
+        val max = slots.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
+        Column {
+            slots.forEach { slot ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                ) {
+                    Column(modifier = Modifier.width(96.dp)) {
+                        Text(
+                            text = slot.tag,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = slot.label,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(slot.count.toFloat() / max)
+                                .clip(RoundedCornerShape(5.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.tertiary,
+                                        ),
+                                    ),
+                                ),
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "${slot.count}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.width(28.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun EmotionGauges(emotions: List<EmotionData>) {
+        SectionTitle("情绪指数")
+        Column {
+            emotions.forEach { emotion ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                ) {
+                    Text(
+                        text = emotion.name,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.width(64.dp),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(8.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .fillMaxWidth(emotion.percent / 100f)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(
+                                    Brush.horizontalGradient(
+                                        listOf(
+                                            MaterialTheme.colorScheme.primary,
+                                            MaterialTheme.colorScheme.tertiary,
+                                        ),
+                                    ),
+                                ),
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "${emotion.percent}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.width(40.dp),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun InsightPanel(aiInsight: String?) {
+        SectionTitle("智能洞察")
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                .padding(14.dp),
+        ) {
+            if (aiInsight != null) {
+                Text(
+                    text = aiInsight,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Text(
+                    text = "未配置 AI 模型，仅显示本地统计",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+
     private suspend fun generateReport(
         talker: String,
         count: Int,
         depth: Int = 2,
-    ): Result<String> = withContext(Dispatchers.IO) {
+    ): Result<GroupChatReportData> = withContext(Dispatchers.IO) {
         runCatching {
             val membersMap = WeDatabaseApi.getGroupMembers(talker).associate { m ->
                 m.wxId to (m.remarkName.takeUnless { it.isBlank() }?.let { "$it (${m.nickname})" } ?: m.nickname)
@@ -332,13 +713,15 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
                 throw IllegalStateException("该群聊最近没有消息，无法生成统计报告")
             }
 
-            val statsReport = buildReport(messages, membersMap, talker)
+            val groupName = runCatching { WeDatabaseApi.getDisplayName(talker) }.getOrDefault(talker)
+            val reportData = buildReportData(messages, membersMap, groupName)
 
-            // 配置了 AI 模型时，用 AI 生成智能群聊分析
+            // 配置了 AI 模型时，用 AI 生成智能群聊洞察
             if (AiModelConfig.isConfigured()) {
-                aiGenerateReport(messages, membersMap, talker, statsReport, depth)
+                val insight = aiGenerateReport(messages, membersMap, talker, reportData.toStatsText(), depth)
+                reportData.copy(aiInsight = insight)
             } else {
-                throw IllegalStateException("未配置 AI 模型，请先点击右上角设置配置 API")
+                reportData
             }
         }
     }
@@ -511,26 +894,20 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
         return trimmed
     }
 
-    private fun buildReport(
+    private fun buildReportData(
         messages: List<WeMessage>,
         membersMap: Map<String, String>,
-        talker: String,
-    ): String {
+        groupName: String,
+    ): GroupChatReportData {
         val totalCount = messages.size
-
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
-        val startTime = dateFormat.format(Date(messages.first().createTime))
-        val endTime = dateFormat.format(Date(messages.last().createTime))
 
         val typeCounts = mutableMapOf<String, Int>()
         val senderCounts = mutableMapOf<String, MutableList<WeMessage>>()
         val timePeriods = mutableMapOf("凌晨" to 0, "上午" to 0, "下午" to 0, "夜晚" to 0)
-        val allTextWords = mutableListOf<String>()
         var laughCount = 0
         var questionCount = 0
         var exclamationCount = 0
         var tildeCount = 0
-        val lengthDist = mutableMapOf("≤5字" to 0, "6-20字" to 0, "21-50字" to 0, ">50字" to 0)
 
         for (msg in messages) {
             val type = MessageType.fromCode(msg.typeCode)
@@ -551,17 +928,6 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
 
             if (type?.isText == true) {
                 val textContent = extractTextContent(msg, membersMap)
-                val words = extractWords(textContent)
-                allTextWords.addAll(words)
-
-                val textLen = textContent.length
-                when {
-                    textLen <= 5 -> lengthDist.mergeCount("≤5字", 1, Int::plus)
-                    textLen <= 20 -> lengthDist.mergeCount("6-20字", 1, Int::plus)
-                    textLen <= 50 -> lengthDist.mergeCount("21-50字", 1, Int::plus)
-                    else -> lengthDist.mergeCount(">50字", 1, Int::plus)
-                }
-
                 if (textContent.contains(Regex("[哈哈呵呵嘿嘿😂🤣]"))) laughCount++
                 if (textContent.endsWith("?") || textContent.endsWith("？")) questionCount++
                 if (textContent.endsWith("!") || textContent.endsWith("！")) exclamationCount++
@@ -569,58 +935,41 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
             }
         }
 
-        val activeSpeakers = senderCounts.size
-
-        val sortedSpeakers = senderCounts.entries
-            .sortedByDescending { it.value.size }
-            .take(10)
-
-        val wordFreq = allTextWords
-            .groupBy { it }
-            .mapValues { it.value.size }
-            .filter { it.key.length >= 2 || it.key.all { c -> c.isLetterOrDigit() } }
-            .filterNot { it.key in commonStopWords }
-            .entries
-            .sortedByDescending { it.value }
-            .take(10)
-
-        val sb = StringBuilder()
-        sb.appendLine("群聊统计报告")
-        sb.appendLine("统计周期:${startTime}至${endTime}")
-        sb.appendLine("总消息:${totalCount}条 发言人数:${activeSpeakers}人")
-        sb.appendLine("消息载体 图片:${typeCounts.getOrDefault("图片", 0)}条 语音:${typeCounts.getOrDefault("语音", 0)}条 文本:${typeCounts.getOrDefault("文本", 0)}条 视频:${typeCounts.getOrDefault("视频", 0)}条 系统:${typeCounts.getOrDefault("系统", 0)}条 文件/链接:${typeCounts.getOrDefault("文件/链接", 0)}条 表情:${typeCounts.getOrDefault("表情", 0)}条")
-        sb.appendLine("发言排行")
-        sortedSpeakers.forEachIndexed { index, (speaker, msgs) ->
-            val displayName = membersMap[speaker] ?: speaker
-            sb.appendLine("${index + 1}.$displayName:${msgs.size}条")
-        }
-        sb.appendLine("活跃时段 凌晨(0-5):${timePeriods["凌晨"]}条 上午(6-11):${timePeriods["上午"]}条 下午(12-17):${timePeriods["下午"]}条 夜晚(18-23):${timePeriods["夜晚"]}条")
-        if (wordFreq.isNotEmpty()) {
-            sb.append("高频词 ")
-            wordFreq.forEachIndexed { index, (word, count) ->
-                sb.append("$word:${count}次")
-                if (index < wordFreq.size - 1) sb.append(" ")
-            }
-            sb.appendLine()
-        }
-        sb.appendLine("情绪指纹")
         val textMsgCount = typeCounts.getOrDefault("文本", 0).coerceAtLeast(1)
-        sb.appendLine("笑点浓度:${"%.1f".format(laughCount.toDouble() / textMsgCount * 100)}% 疑问句比例:${"%.1f".format(questionCount.toDouble() / textMsgCount * 100)}% 感叹句比例:${"%.1f".format(exclamationCount.toDouble() / textMsgCount * 100)}% 波浪号比例:${"%.1f".format(tildeCount.toDouble() / textMsgCount * 100)}%")
-        sb.appendLine("废话程度鉴定 ≤5字:${lengthDist["≤5字"]}条 6-20字:${lengthDist["6-20字"]}条 21-50字:${lengthDist["21-50字"]}条 >50字:${lengthDist[">50字"]}条")
-        sb.appendLine("用户画像")
-        sortedSpeakers.forEach { (speaker, msgs) ->
-            val displayName = membersMap[speaker] ?: speaker
-            val pct = "%.1f".format(msgs.size.toDouble() / totalCount * 100)
-            val mainType = msgs.groupBy { m ->
-                val t = MessageType.fromCode(m.typeCode)
-                categorizeMessageType(t, m.typeCode)
-            }.maxByOrNull { it.value.size }?.key ?: "文本"
-            sb.appendLine("·$displayName:${msgs.size}条($pct%),主发$mainType")
-        }
-        sb.appendLine()
-        sb.appendLine("Hchat 群聊统计·${SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())}")
+        val percent = { n: Int -> (n.toDouble() / textMsgCount * 100).toInt() }
 
-        return sb.toString()
+        val timeSlots = listOf(
+            TimeSlotData("00:00 - 06:00", "深夜精灵", timePeriods["凌晨"] ?: 0),
+            TimeSlotData("06:00 - 12:00", "晨间飞侠", timePeriods["上午"] ?: 0),
+            TimeSlotData("12:00 - 18:00", "午后玩家", timePeriods["下午"] ?: 0),
+            TimeSlotData("18:00 - 24:00", "夜猫子", timePeriods["夜晚"] ?: 0),
+        )
+
+        val emotions = listOf(
+            EmotionData("快乐浓度", percent(laughCount)),
+            EmotionData("疑问指数", percent(questionCount)),
+            EmotionData("激情指数", percent(exclamationCount)),
+            EmotionData("随和指数", percent(tildeCount)),
+        )
+
+        return GroupChatReportData(
+            groupName = groupName,
+            totalCount = totalCount,
+            activeSpeakers = senderCounts.size,
+            textCount = typeCounts.getOrDefault("文本", 0),
+            typeCounts = typeCounts,
+            timeSlots = timeSlots,
+            emotions = emotions,
+            aiInsight = null,
+        )
+    }
+
+    private fun GroupChatReportData.toStatsText(): String = buildString {
+        appendLine("群聊统计报告")
+        appendLine("群名:$groupName 总消息:${totalCount}条 发言人数:${activeSpeakers}人 文本:${textCount}条")
+        appendLine("消息载体 图片:${typeCounts.getOrDefault("图片", 0)}条 语音:${typeCounts.getOrDefault("语音", 0)}条 视频:${typeCounts.getOrDefault("视频", 0)}条 表情:${typeCounts.getOrDefault("表情", 0)}条")
+        appendLine("活跃时段 ${timeSlots.joinToString(" ") { "${it.tag}:${it.count}条" }}")
+        appendLine("情绪指数 ${emotions.joinToString(" ") { "${it.name}:${it.percent}%" }}")
     }
 
     private fun categorizeMessageType(type: MessageType?, rawCode: Int): String {
@@ -648,24 +997,6 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
         val match = groupSenderRegex.find(msg.content)
         return match?.groupValues?.get(2) ?: msg.content
     }
-
-    private fun extractWords(text: String): List<String> {
-        return text.split(Regex("[\\s,，。！？、；：\"\"''（（））《》【】\\[\\]\\{\\}「」『』\\.!?;:，。！？、；：\n\r\t]+"))
-            .map { it.trim() }
-            .filter { it.isNotBlank() && it.length >= 2 }
-    }
-
-    private val commonStopWords = setOf(
-        "的", "了", "是", "在", "我", "有", "和", "就", "不", "人", "都", "一",
-        "一个", "上", "也", "很", "到", "说", "要", "去", "你", "会", "着",
-        "没有", "看", "好", "自己", "这", "他", "她", "它", "们", "那", "些",
-        "什么", "怎么", "因为", "所以", "但是", "如果", "虽然", "可以", "这个",
-        "那个", "吧", "吗", "啊", "嗯", "哦", "哈", "呀", "呢", "啦", "么",
-        "还是", "就是", "不是", "只是", "但是", "而且", "或者", "然后", "以后",
-        "时候", "现在", "已经", "可能", "应该", "没有", "觉得", "知道", "看到",
-        "过来", "出来", "起来", "进去", "回到", "拿到", "想到", "我们", "你们",
-        "他们", "大家", "东西", "意思", "时间", "朋友", "回复", "收到", "明白",
-    )
 
     private fun <K> MutableMap<K, Int>.mergeCount(key: K, value: Int, op: (Int, Int) -> Int) {
         this[key] = op(this.getOrDefault(key, 0), value)

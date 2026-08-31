@@ -3832,7 +3832,6 @@
     <string name="ui_group_normal">标准分析</string>
     <string name="ui_group_deep">深度解析</string>
     <string name="ui_group_wuhan">武汉口语</string>
-    <string name="ui_group_result">分析结果</string>
     <string name="ui_hot_title">话题热度统计</string>
     <string name="ui_hot_range">统计范围</string>
     <string name="ui_hot_fast">快速热度</string>

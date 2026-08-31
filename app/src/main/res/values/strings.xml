@@ -3822,7 +3822,6 @@
     <string name="ui_group_normal">Standard</string>
     <string name="ui_group_deep">Deep Analysis</string>
     <string name="ui_group_wuhan">Wuhan Dialect</string>
-    <string name="ui_group_result">Analysis Result</string>
     <string name="ui_hot_title">Topic Heat Stats</string>
     <string name="ui_hot_range">Stats Range</string>
     <string name="ui_hot_fast">Quick Heat</string>
