@@ -682,6 +682,8 @@
     <string name="feature_view_sticker_as_image_description">點擊聊天中的貼紙時使用微信原生圖片查看器打開</string>
     <string name="feature_voice_message_playback_optimization_name">語音消息播放邏輯優化</string>
     <string name="feature_voice_message_playback_optimization_description">優化語音消息聽筒/揚聲器自動切換: 完全禁用自動切換, 或切換後繼承播放進度不再從頭重播</string>
+    <string name="feature_voice_message_menu_name">語音消息菜單</string>
+    <string name="feature_voice_message_menu_description">將「語音消息」添加到長按消息菜單和聊天工具欄</string>
     <string name="feature_voice_panel_name">語音面板</string>
     <string name="feature_voice_panel_description">長按語音按鈕打開語音面板</string>
     <string name="feature_mention_members_name">@所有人</string>
@@ -1201,6 +1203,7 @@
     <string name="chat_toolbar_tool_contact_card">個人名片</string>
     <string name="chat_toolbar_tool_music">音樂</string>
     <string name="chat_toolbar_quick_reply">快捷回覆</string>
+    <string name="chat_toolbar_voice_message">語音消息</string>
     <string name="chat_toolbar_display_style">顯示樣式</string>
     <string name="chat_toolbar_select_display_style_description">選擇顯示樣式</string>
     <string name="chat_toolbar_display_order">顯示與順序</string>
@@ -1556,7 +1559,9 @@
     <string name="tts_current_voice">當前音色</string>
     <string name="tts_mode_clone">克隆語音</string>
     <string name="tts_mode_edge">Edge TTS</string>
+    <string name="tts_mode_tiax">tiax 音色</string>
     <string name="tts_mode_system">系統 TTS</string>
+    <string name="tts_manage_tiax">管理 tiax</string>
     <string name="tts_text_counter">%1$d/%2$d</string>
     <string name="tts_text_label">轉換的文字</string>
     <string name="voice_clone_name">音色名稱</string>
@@ -1679,6 +1684,15 @@
     <string name="voice_panel_upload_voice">上傳語音</string>
     <string name="voice_panel_voice_examples">語音示例</string>
     <string name="voice_setting_pack_layout">本地及共享語音包一級界面</string>
+    <string name="voice_tiax_configure_title">配置 tiax</string>
+    <string name="tiax_apikey_label">API Key</string>
+    <string name="tiax_apikey_placeholder">你的 tiax API key</string>
+    <string name="tiax_test_connection">測試連接</string>
+    <string name="tiax_testing">測試中…</string>
+    <string name="tiax_connection_success">連接成功 (%1$s)</string>
+    <string name="tiax_connection_failed">連接失敗: %1$s</string>
+    <string name="tiax_apikey_required">需要填寫 API Key</string>
+    <string name="voice_directory_url_label">自定義目錄 URL (JSON)</string>
     <plurals name="panel_concurrency_summary">
         <item quantity="other">同時運行 %1$d 個任務 · 點擊修改</item>
     </plurals>
@@ -2502,6 +2516,7 @@
     <string name="chat_voice_category_invalid">無效分類</string>
     <string name="chat_voice_item_invalid">無效語音</string>
     <string name="chat_voice_download_url_unavailable">沒有可用下載地址</string>
+    <string name="chat_voice_directory_url_unconfigured">未配置目錄 URL</string>
     <string name="chat_voice_object_unavailable">沒有可用語音對象</string>
     <string name="chat_voice_category_latest">最新發布</string>
     <string name="chat_voice_category_recently_updated">最近更新</string>
