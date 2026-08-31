@@ -67,7 +67,10 @@ object TiaxTtsClient {
         httpClient.newCall(Request.Builder().url(url).get().build()).awaitResponse().use { response ->
             val body = response.body.string()
             if (!response.isSuccessful) {
-                throw IllegalStateException(parseErrorMessage(body) ?: "tiax 请求失败：HTTP ${response.code}")
+                throw IllegalStateException(parseErrorMessage(body) ?: when (response.code) {
+                    401, 403 -> "tiax API Key 无效或未配置，请检查语音面板配置"
+                    else -> "tiax 请求失败：HTTP ${response.code}"
+                })
             }
             val obj = DefaultJson.parseToJsonElement(body).jsonObject
             val code = obj["code"]?.jsonPrimitive?.content
@@ -84,9 +87,12 @@ object TiaxTtsClient {
         }
     }
 
-    /** 尝试从 JSON 错误响应中提取 msg 字段。 */
+    /** 尝试从 JSON 错误响应中提取消息（兼容嵌套 error.message 与旧版 msg 字段）。 */
     private fun parseErrorMessage(body: String): String? = try {
-        DefaultJson.parseToJsonElement(body).jsonObject["msg"]?.jsonPrimitive?.content
+        val obj = DefaultJson.parseToJsonElement(body).jsonObject
+        obj["msg"]?.jsonPrimitive?.content
+            ?: obj["error"]?.jsonObject?.get("message")?.jsonPrimitive?.content
+            ?: obj["message"]?.jsonPrimitive?.content
     } catch (_: Throwable) {
         null
     }
