@@ -79,6 +79,18 @@ abstract class BaseFeature {
 
     open fun onDisable() {}
 
+    /**
+     * 上报本功能 UI 已真实注入并生效(Activity resume 异步注入完成后调用)。
+     * 见 [FeatureRuntimeReporter.report]。
+     */
+    fun reportRuntimeOk(detail: String = "") = FeatureRuntimeReporter.report(technicalId, ok = true, detail = detail)
+
+    /**
+     * 上报本功能 UI 未真实生效(注入失败/关键入口未挂上时调用),排查页据此标记
+     * 该功能为 PARTIAL,避免「装上了但其实没效果」的假阳性。见 [FeatureRuntimeReporter.report]。
+     */
+    fun reportRuntimePartial(detail: String) = FeatureRuntimeReporter.report(technicalId, ok = false, detail = detail)
+
     private val _dexDelegates = mutableListOf<BaseDexDelegate>()
     val dexDelegates: List<BaseDexDelegate> get() = _dexDelegates
     internal fun registerDexDelegate(d: BaseDexDelegate) {

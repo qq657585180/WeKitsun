@@ -981,6 +981,7 @@ object FloatingChatHeader : ClickableFeature(), IResolveDex {
         val root = layout.parent as? RelativeLayout
         if (root == null) {
             if (reparentBlocked.put(layout, true) == null) {
+                reportRuntimePartial("expected RelativeLayout chat root, got ${layout.parent?.javaClass?.name}")
                 WeLogger.w(
                     TAG,
                     "reparent skipped: expected RelativeLayout root, got ${layout.parent?.javaClass?.name}"
@@ -997,6 +998,7 @@ object FloatingChatHeader : ClickableFeature(), IResolveDex {
         val lp = RelativeLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, height)
         lp.addRule(RelativeLayout.ALIGN_PARENT_TOP)
         root.addView(header, lp)
+        reportRuntimeOk("title bar reparented onto chat root")
         WeLogger.d(TAG, "reparented title bar onto chat root (topOffset=${headerTopOffsets[layout]})")
     }
 

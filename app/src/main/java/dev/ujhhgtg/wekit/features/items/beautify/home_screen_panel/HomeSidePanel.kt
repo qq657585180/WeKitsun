@@ -257,6 +257,7 @@ object HomeSidePanel : SwitchFeature(), IResolveDex {
             val parent = viewPager.parent as? FrameLayout
             if (parent == null) {
                 WeLogger.e(TAG, "MainTabUI mViewPager parent is not a FrameLayout")
+                reportRuntimePartial("mViewPager parent is not a FrameLayout")
                 return@hookAfter
             }
             if (sessions[viewPager]?.get() != null) return@hookAfter
@@ -264,6 +265,7 @@ object HomeSidePanel : SwitchFeature(), IResolveDex {
             val session = HomeSidePanelSession(activity, parent, viewPager, tabsAdapter).also { it.attach() }
             session.setSelectedTab(viewPager.currentItem)
             sessions[viewPager] = WeakReference(session)
+            reportRuntimeOk("panel attached on ${activity.javaClass.simpleName}")
         }
     }
 

@@ -691,9 +691,11 @@ object ReplaceNavigationBar : ClickableFeature(), IResolveDex {
                         Gravity.BOTTOM
                     )
                 )
+                reportRuntimeOk("floating bar overlaid on ${activity.javaClass.simpleName}")
             } else {
                 bottomTabViewGroup.removeAllViews()
                 bottomTabViewGroup.addView(composeView)
+                reportRuntimeOk("navigation bar replaced on ${activity.javaClass.simpleName}")
             }
         }
 

@@ -765,6 +765,8 @@
     <string name="feature_redirect_host_logs_description">將微信內部日誌打印至模塊日誌</string>
     <string name="feature_reset_dex_cache_name">重置解析緩存</string>
     <string name="feature_reset_dex_cache_description">清除全部 DEX 解析緩存，等待下次啓動時重新解析</string>
+    <string name="feature_runtime_status_diagnose_name">執行時期狀態診斷</string>
+    <string name="feature_runtime_status_diagnose_description">查看 UI 注入類功能在執行時期是否真實生效</string>
     <string name="feature_send_packet_name">發包調試</string>
     <string name="feature_send_packet_description">發送自定義數據包到微信服務器</string>
     <string name="feature_trigger_crash_name">測試崩潰</string>
@@ -3541,6 +3543,11 @@
     <string name="debug_reset_dex_cache_confirmation">確定清除全部 DEX 解析緩存嗎？</string>
     <string name="debug_reset_dex_cache_success">解析緩存已清除</string>
     <string name="debug_reset_dex_cache_title">重置解析緩存</string>
+    <string name="debug_runtime_status_dialog_title">執行時期狀態</string>
+    <string name="debug_runtime_status_empty">暫無執行時期狀態上報。打開懸浮 FAB、側邊欄、導航欄等 UI 注入類功能後重新打開本對話框。</string>
+    <string name="debug_runtime_status_ok">生效中</string>
+    <string name="debug_runtime_status_partial">未生效</string>
+    <string name="debug_runtime_status_refresh">刷新</string>
     <string name="debug_trigger_crash_category_java">Java 層崩潰</string>
     <string name="debug_trigger_crash_category_native">Native 層崩潰</string>
     <string name="debug_trigger_crash_select_category">選擇崩潰類別</string>

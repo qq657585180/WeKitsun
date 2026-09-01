@@ -767,6 +767,8 @@
     <string name="feature_redirect_host_logs_description">将微信内部日志打印至模块日志</string>
     <string name="feature_reset_dex_cache_name">重置解析缓存</string>
     <string name="feature_reset_dex_cache_description">清除全部 DEX 解析缓存，等待下次启动时重新解析</string>
+    <string name="feature_runtime_status_diagnose_name">运行时状态诊断</string>
+    <string name="feature_runtime_status_diagnose_description">查看 UI 注入类功能在运行时是否真实生效</string>
     <string name="feature_send_packet_name">发包调试</string>
     <string name="feature_send_packet_description">发送自定义数据包到微信服务器</string>
     <string name="feature_trigger_crash_name">测试崩溃</string>
@@ -3557,6 +3559,11 @@
     <string name="debug_reset_dex_cache_confirmation">确定清除全部 DEX 解析缓存吗？</string>
     <string name="debug_reset_dex_cache_success">解析缓存已清除</string>
     <string name="debug_reset_dex_cache_title">重置解析缓存</string>
+    <string name="debug_runtime_status_dialog_title">运行时状态</string>
+    <string name="debug_runtime_status_empty">暂无运行时状态上报。打开悬浮 FAB、侧边栏、导航栏等 UI 注入类功能后重新打开本对话框。</string>
+    <string name="debug_runtime_status_ok">生效中</string>
+    <string name="debug_runtime_status_partial">未生效</string>
+    <string name="debug_runtime_status_refresh">刷新</string>
     <string name="debug_trigger_crash_category_java">Java 层崩溃</string>
     <string name="debug_trigger_crash_category_native">Native 层崩溃</string>
     <string name="debug_trigger_crash_select_category">选择崩溃类别</string>

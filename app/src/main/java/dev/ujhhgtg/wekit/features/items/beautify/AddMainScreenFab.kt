@@ -554,6 +554,7 @@ object AddMainScreenFab : ClickableFeature() {
                 }
             root.addView(hostView)
             hostViews[activity] = WeakReference(hostView)
+            reportRuntimeOk("Fab added to ${activity.javaClass.simpleName}")
         }
 
         LauncherUI::startChatting.fastJavaMethod!!.hookBefore {

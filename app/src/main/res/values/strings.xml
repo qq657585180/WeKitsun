@@ -803,6 +803,8 @@
     <string name="feature_redirect_host_logs_description">Print WeChat internal logs to module logs</string>
     <string name="feature_reset_dex_cache_name">Reset resolution cache</string>
     <string name="feature_reset_dex_cache_description">Clear all DEX resolution caches and resolve again on the next startup</string>
+    <string name="feature_runtime_status_diagnose_name">Runtime status diagnosis</string>
+    <string name="feature_runtime_status_diagnose_description">View which UI-injected features actually took effect at runtime</string>
     <string name="feature_send_packet_name">Packet debugging</string>
     <string name="feature_send_packet_description">Send custom data packets to WeChat server</string>
     <string name="feature_trigger_crash_name">Trigger test crash</string>
@@ -3521,6 +3523,11 @@
     <string name="debug_reset_dex_cache_confirmation">Clear the entire DEX resolution cache?</string>
     <string name="debug_reset_dex_cache_success">Resolution cache cleared</string>
     <string name="debug_reset_dex_cache_title">Reset resolution cache</string>
+    <string name="debug_runtime_status_dialog_title">Runtime status</string>
+    <string name="debug_runtime_status_empty">No runtime status reported yet. Open a UI-injected feature (such as floating FAB, home side panel or navigation bar) and reopen this dialog.</string>
+    <string name="debug_runtime_status_ok">active</string>
+    <string name="debug_runtime_status_partial">not taking effect</string>
+    <string name="debug_runtime_status_refresh">Refresh</string>
     <string name="debug_trigger_crash_category_java">Java-layer crash</string>
     <string name="debug_trigger_crash_category_native">Native-layer crash</string>
     <string name="debug_trigger_crash_select_category">Select crash category</string>
