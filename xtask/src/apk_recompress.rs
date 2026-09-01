@@ -178,7 +178,7 @@ fn resolve_build_tool(
                 .filter_map(|e| e.ok().map(|e| e.path()))
                 .filter(|p| p.is_dir())
                 .collect();
-            versions.sort_by(cmp_version_path);
+            versions.sort_by(|a, b| cmp_version_path(a, b));
             if let Some(dir) = versions.last() {
                 let candidate = dir.join(file_name);
                 if candidate.exists() {
