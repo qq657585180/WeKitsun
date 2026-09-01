@@ -176,6 +176,8 @@
     <string name="agent_overlay_mode_disabled">禁用</string>
     <string name="agent_overlay_mode_foreground_only">仅在微信前台时显示</string>
     <string name="agent_overlay_mode_always">始终显示</string>
+    <string name="agent_overlay_dock_to_edge_title">悬浮窗默认贴边隐藏</string>
+    <string name="agent_overlay_dock_to_edge_summary">每次打开微信时悬浮球默认收起到屏幕右边缘，拖动松手后自动吸附到最近边缘</string>
     <string name="agent_section_models">模型</string>
     <string name="agent_model_providers_title">模型提供方</string>
     <string name="agent_model_providers_summary">配置 OpenAI / Anthropic / Gemini 服务器、API Key、模型</string>

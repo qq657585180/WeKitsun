@@ -192,6 +192,8 @@
     <string name="agent_overlay_mode_disabled">Disabled</string>
     <string name="agent_overlay_mode_foreground_only">Only while WeChat is in the foreground</string>
     <string name="agent_overlay_mode_always">Always</string>
+    <string name="agent_overlay_dock_to_edge_title">Dock to edge by default</string>
+    <string name="agent_overlay_dock_to_edge_summary">Auto-tuck the floating ball to the screen edge on every WeChat launch; snap to the nearest edge after dragging.</string>
     <string name="agent_section_models">Models</string>
     <string name="agent_model_providers_title">Model providers</string>
     <string name="agent_model_providers_summary">Configure OpenAI, Anthropic, and Gemini servers, API keys, and models</string>

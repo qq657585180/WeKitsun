@@ -37,6 +37,7 @@ import dev.ujhhgtg.wekit.agent.data.WeAgentSettings
 import dev.ujhhgtg.wekit.agent.tool.ToolLoadingMode
 import dev.ujhhgtg.wekit.features.api.agent.WeAgentService
 import dev.ujhhgtg.wekit.features.items.system.agent.WeAgentOverlayController
+import dev.ujhhgtg.wekit.preferences.WePrefs
 import dev.ujhhgtg.wekit.ui.content.m3.BaseWidget
 import dev.ujhhgtg.wekit.ui.content.m3.DropDownMenuWidget
 import dev.ujhhgtg.wekit.ui.content.m3.DropdownOption
@@ -54,6 +55,7 @@ fun WeAgentHomeScreen(onOpen: (AgentSettingsRoute) -> Unit) {
     var loaded by remember { mutableStateOf(false) }
     var dynamicTools by remember { mutableStateOf(false) }
     var overlayMode by remember { mutableStateOf(OverlayMode.DISABLED) }
+    var dockToEdge by remember { mutableStateOf(false) }
     var sendWhileRunning by remember { mutableStateOf(WeAgentService.SendWhileRunningMode.QUEUE_AFTER_TURN) }
     var smallModelId by remember { mutableStateOf<String?>(null) }
     var defaultModelId by remember { mutableStateOf<String?>(null) }
@@ -72,6 +74,7 @@ fun WeAgentHomeScreen(onOpen: (AgentSettingsRoute) -> Unit) {
     LaunchedEffect(Unit) {
         dynamicTools = WeAgentSettings.toolLoadingMode() == ToolLoadingMode.DYNAMIC
         overlayMode = WeAgentSettings.overlayMode()
+        dockToEdge = WePrefs.getBoolOrDef(WeAgentOverlayController.PREF_BALL_DOCK_TO_EDGE_KEY, false)
         sendWhileRunning = WeAgentSettings.sendWhileRunningMode()
         smallModelId = WeAgentSettings.smallModelId()
         defaultModelId = WeAgentSettings.defaultModelId()
@@ -96,6 +99,19 @@ fun WeAgentHomeScreen(onOpen: (AgentSettingsRoute) -> Unit) {
                                 overlayMode = mode
                                 WeAgentOverlayController.setMode(mode)
                                 scope.launch { WeAgentSettings.set(WeAgentSettings.KEY_OVERLAY_MODE, mode.name) }
+                            },
+                        )
+                    }
+                    item {
+                        SwitchWidget(
+                            icon = MaterialSymbols.Outlined.Smart_toy,
+                            iconPlaceholder = false,
+                            title = stringResource(R.string.agent_overlay_dock_to_edge_title),
+                            description = stringResource(R.string.agent_overlay_dock_to_edge_summary),
+                            checked = dockToEdge,
+                            onCheckedChange = { enabled ->
+                                dockToEdge = enabled
+                                WeAgentOverlayController.setDockToEdge(enabled)
                             },
                         )
                     }

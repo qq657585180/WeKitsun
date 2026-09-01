@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -278,7 +279,12 @@ private fun ChatPane(modifier: Modifier, onDismiss: () -> Unit, onOpenSidebar: (
     // Hoisted here so the preset picker can insert text into the input bar.
     var inputText by remember { mutableStateOf("") }
 
-    Column(modifier.padding(8.dp)) {
+    Column(
+        Modifier
+            .padding(8.dp)
+            // 键盘弹出时把整列顶到 IME 上方，发送栏不被遮住（配合窗口层 SOFT_INPUT_ADJUST_RESIZE）
+            .imePadding(),
+    ) {
         // Header: sidebar toggle + title + settings entry + close.
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onOpenSidebar) {

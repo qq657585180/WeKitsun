@@ -46,6 +46,12 @@ object WeAgentOverlayController {
     private const val PREF_BALL_X = "weagent_ball_x"
     private const val PREF_BALL_Y = "weagent_ball_y"
 
+    /** 悬浮球默认贴边隐藏开关（对应 Miss-WeChat 的 wc_music_player_start_hidden）。 */
+    const val PREF_BALL_DOCK_TO_EDGE_KEY = "weagent_ball_dock_to_edge"
+
+    /** 贴边时悬浮球与屏幕边缘的间距（dp）。 */
+    private const val EDGE_MARGIN_DP = 8
+
     private val wm: WindowManager
         get() = HostInfo.application.getSystemService<WindowManager>()
 
@@ -69,6 +75,26 @@ object WeAgentOverlayController {
     /** Which visibility rule the ball follows (§ 界面 setting). */
     @Volatile
     private var mode = OverlayMode.DISABLED
+
+    /** 悬浮球默认贴边隐藏（每次打开微信默认收起到屏幕右边缘，拖动松手吸附最近边缘）。 */
+    @Volatile
+    private var dockToEdge = false
+
+    /**
+     * 切换悬浮球贴边隐藏。开启时立即将当前球吸附到最近边缘；关闭时保持原位。
+     * 必须在主线程调用。
+     */
+    fun setDockToEdge(enabled: Boolean) {
+        if (dockToEdge == enabled) return
+        dockToEdge = enabled
+        WePrefs.putBool(PREF_BALL_DOCK_TO_EDGE_KEY, enabled)
+        val v = ballView ?: return
+        val p = ballParams ?: return
+        if (enabled) {
+            snapToNearestEdge(v, p)
+            runCatching { wm.updateViewLayout(v, p) }
+        }
+    }
 
     fun canDrawOverlays(): Boolean = Settings.canDrawOverlays(HostInfo.application)
 
@@ -139,13 +165,13 @@ object WeAgentOverlayController {
     // -----------------------------------------------------------------------------------------
 
     private fun addBall() {
+        dockToEdge = WePrefs.getBoolOrDef(PREF_BALL_DOCK_TO_EDGE_KEY, false)
         val params = baseLayoutParams(focusable = false).apply {
             gravity = Gravity.TOP or Gravity.START
             x = WePrefs.getIntOrDef(PREF_BALL_X, 24)
             y = WePrefs.getIntOrDef(PREF_BALL_Y, 240)
         }
         ballParams = params
-
         val owner = LifecycleOwnerProvider.lifecycleOwner
         val view = ComposeView(HostInfo.application).apply {
             setLifecycleOwner(owner)
@@ -170,7 +196,11 @@ object WeAgentOverlayController {
                             val p = ballParams ?: return@WeAgentBall
                             val v = ballView
                             if (v != null) {
-                                clampToScreen(v, p)
+                                if (dockToEdge) {
+                                    snapToNearestEdge(v, p)
+                                } else {
+                                    clampToScreen(v, p)
+                                }
                                 runCatching { wm.updateViewLayout(v, p) }
                             }
                             WePrefs.putInt(PREF_BALL_X, p.x)
@@ -182,6 +212,11 @@ object WeAgentOverlayController {
         }
         ballView = view
         wm.addView(view, params)
+        // 每次打开微信（attach）时，若开启贴边则默认收起到右侧边缘
+        if (dockToEdge) {
+            snapToRightEdge(params)
+            runCatching { wm.updateViewLayout(view, params) }
+        }
     }
 
     /** Keeps the ball fully on-screen after a drag. */
@@ -191,6 +226,29 @@ object WeAgentOverlayController {
         val h = if (view.height > 0) view.height else (52 * metrics.density).toInt()
         params.x = params.x.coerceIn(0, (metrics.widthPixels - w).coerceAtLeast(0))
         params.y = params.y.coerceIn(0, (metrics.heightPixels - h).coerceAtLeast(0))
+    }
+
+    /**
+     * 将悬浮球吸附到最近的左/右边缘（贴边隐藏）。对应 Miss-WeChat 的 hideToEdge。
+     */
+    private fun snapToNearestEdge(view: View, params: WindowManager.LayoutParams) {
+        val metrics = view.resources.displayMetrics
+        val w = if (view.width > 0) view.width else (52 * metrics.density).toInt()
+        val centerX = params.x + w / 2f
+        val rightEdgeX = metrics.widthPixels - w - (EDGE_MARGIN_DP * metrics.density).toInt()
+        params.x = if (centerX < metrics.widthPixels / 2f) {
+            (EDGE_MARGIN_DP * metrics.density).toInt()
+        } else {
+            rightEdgeX.coerceAtLeast(0)
+        }
+    }
+
+    /** 将悬浮球收起到屏幕右边缘（默认贴边位置）。 */
+    private fun snapToRightEdge(params: WindowManager.LayoutParams) {
+        val v = ballView ?: return
+        val metrics = v.resources.displayMetrics
+        val w = if (v.width > 0) v.width else (52 * metrics.density).toInt()
+        params.x = (metrics.widthPixels - w - (EDGE_MARGIN_DP * metrics.density).toInt()).coerceAtLeast(0)
     }
 
     // -----------------------------------------------------------------------------------------
@@ -279,7 +337,13 @@ object WeAgentOverlayController {
             type,
             flags,
             PixelFormat.TRANSLUCENT,
-        )
+        ).apply {
+            // 可聚焦窗口（WeAgent 面板）在输入法弹出时自动缩小到键盘上方，
+            // 避免底部发送栏被键盘遮住。
+            if (focusable) {
+                softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            }
+        }
     }
 }
 
