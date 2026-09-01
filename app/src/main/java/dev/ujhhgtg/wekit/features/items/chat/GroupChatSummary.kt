@@ -43,8 +43,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Auto_awesome
-import dev.ujhhgtg.wekit.agent.data.entity.ModelEntity
-import dev.ujhhgtg.wekit.agent.data.entity.ModelProviderEntity
+import dev.ujhhgtg.wekit.agent.data.WeAgentRepository
+import dev.ujhhgtg.wekit.agent.data.WeAgentSettings
 import dev.ujhhgtg.wekit.agent.model.LlmMessage
 import dev.ujhhgtg.wekit.agent.model.LlmRole
 import dev.ujhhgtg.wekit.agent.model.LlmStreamEvent
@@ -716,8 +716,10 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
             val groupName = runCatching { WeDatabaseApi.getDisplayName(talker) }.getOrDefault(talker)
             val reportData = buildReportData(messages, membersMap, groupName)
 
-            // 配置了 AI 模型时，用 AI 生成智能群聊洞察
-            if (AiModelConfig.isConfigured()) {
+            // 配置了 WeAgent 模型时，用 AI 生成智能群聊洞察
+            val defaultModelId = WeAgentSettings.defaultModelId()
+                ?: WeAgentRepository.firstModelId()
+            if (defaultModelId != null) {
                 val insight = aiGenerateReport(messages, membersMap, talker, reportData.toStatsText(), depth)
                 reportData.copy(aiInsight = insight)
             } else {
@@ -827,25 +829,13 @@ object GroupChatSummary : SwitchFeature(), WeChatMessageContextMenuApi.IMenuItem
         statsReport: String,
         depth: Int = 2,
     ): String {
-        check(AiModelConfig.baseUrl.isNotBlank()) { "未配置 API 地址" }
-        check(AiModelConfig.apiKey.isNotBlank()) { "未配置 API Key" }
-        check(AiModelConfig.modelId.isNotBlank()) { "未配置模型 ID" }
-
-        val provider = ModelProviderEntity(
-            id = "ai_reply",
-            type = AiModelConfig.providerType(),
-            name = "AI回复",
-            baseUrl = AiModelConfig.baseUrl.trim(),
-            apiKey = AiModelConfig.apiKey.trim(),
-        )
-        val model = ModelEntity(
-            id = "ai_reply_model",
-            providerId = provider.id,
-            modelIdRemote = AiModelConfig.modelId.trim(),
-            reasoningEffort = null,
-            customJsonOverride = null,
-            displayName = AiModelConfig.modelId.trim(),
-        )
+        val modelId = WeAgentSettings.defaultModelId()
+            ?: WeAgentRepository.firstModelId()
+            ?: throw IllegalStateException("未配置AI模型，请先在WeAgent设置中添加模型")
+        val model = WeAgentRepository.getModel(modelId)
+            ?: throw IllegalStateException("未找到模型: $modelId")
+        val provider = WeAgentRepository.getModelProvider(model.providerId)
+            ?: throw IllegalStateException("未找到模型提供者: ${model.providerId}")
         val client = ModelProviderManager.clientFor(provider)
 
         // 最近聊天片段（最多 30 条）
