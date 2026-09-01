@@ -341,7 +341,7 @@ object ParseVideo : ClickableFeature() {
             }
         }
         if (result.isFailure) {
-            WeLogger.e(TAG, "auto reply failed", result.exceptionOrNull())
+            WeLogger.e(TAG, "auto reply failed", result.exceptionOrNull() ?: error("auto reply failed"))
         }
     }
 
@@ -369,6 +369,49 @@ fun showParseDialog(context: android.content.Context) {
                 val extracted = extractVideoUrl(clip)
                 if (extracted.isNotEmpty()) {
                     link = extracted
+                }
+            }
+
+            fun downloadAndSend(data: VideoData) {
+                val talker = WeCurrentConversationApi.value
+                if (talker.isBlank()) {
+                    pendingSendAfterParse = false
+                    errorMsg = localizedChatInputString(R.string.parse_video_no_conversation)
+                    return
+                }
+                if (sending) return
+                sending = true
+                downloadProgress = 0f
+                errorMsg = null
+                scope.launch {
+                    val saveResult = withContext(Dispatchers.IO) {
+                        val dir = java.io.File(appContext.cacheDir ?: appContext.filesDir, "parse_video_send")
+                            .apply { mkdirs() }
+                        val out = java.io.File(dir, "send-${UUID.randomUUID()}.mp4")
+                        downloadVideo(data.video_link, out) { downloaded, total ->
+                            if (total > 0 && downloaded > 0) {
+                                downloadProgress = (downloaded.toFloat() / total).coerceIn(0f, 1f)
+                            }
+                        }
+                    }
+                    sending = false
+                    saveResult.fold(
+                        onSuccess = { file ->
+                            scope.launch {
+                                val sent = withContext(Dispatchers.IO) { WeMessageApi.sendVideo(talker, file.absolutePath) }
+                                if (sent) {
+                                    showToast(localizedChatInputString(R.string.parse_video_sent))
+                                    onDismiss()
+                                } else {
+                                    errorMsg = localizedChatInputString(R.string.parse_video_send_failed)
+                                }
+                            }
+                        },
+                        onFailure = { e ->
+                            WeLogger.e(TAG, "download for send failed", e)
+                            errorMsg = localizedChatInputString(R.string.parse_video_download_failed, e.message.orEmpty())
+                        },
+                    )
                 }
             }
 
@@ -420,49 +463,6 @@ fun showParseDialog(context: android.content.Context) {
                 } else {
                     pendingSendAfterParse = true
                     doParse()
-                }
-            }
-
-            fun downloadAndSend(data: VideoData) {
-                val talker = WeCurrentConversationApi.value
-                if (talker.isBlank()) {
-                    pendingSendAfterParse = false
-                    errorMsg = localizedChatInputString(R.string.parse_video_no_conversation)
-                    return
-                }
-                if (sending) return
-                sending = true
-                downloadProgress = 0f
-                errorMsg = null
-                scope.launch {
-                    val saveResult = withContext(Dispatchers.IO) {
-                        val dir = java.io.File(appContext.cacheDir ?: appContext.filesDir, "parse_video_send")
-                            .apply { mkdirs() }
-                        val out = java.io.File(dir, "send-${UUID.randomUUID()}.mp4")
-                        downloadVideo(data.video_link, out) { downloaded, total ->
-                            if (total > 0 && downloaded > 0) {
-                                downloadProgress = (downloaded.toFloat() / total).coerceIn(0f, 1f)
-                            }
-                        }
-                    }
-                    sending = false
-                    saveResult.fold(
-                        onSuccess = { file ->
-                            scope.launch {
-                                val sent = withContext(Dispatchers.IO) { WeMessageApi.sendVideo(talker, file.absolutePath) }
-                                if (sent) {
-                                    showToast(localizedChatInputString(R.string.parse_video_sent))
-                                    onDismiss()
-                                } else {
-                                    errorMsg = localizedChatInputString(R.string.parse_video_send_failed)
-                                }
-                            }
-                        },
-                        onFailure = { e ->
-                            WeLogger.e(TAG, "download for send failed", e)
-                            errorMsg = localizedChatInputString(R.string.parse_video_download_failed, e.message.orEmpty())
-                        },
-                    )
                 }
             }
 
