@@ -150,6 +150,34 @@ object ParseVideo : SwitchFeature() {
 
     // ==================== 解析 + 下载 + 发送 ====================
 
+    private val webUserAgent =
+        "Mozilla/5.0 (Linux; Android 12; Pixel 5 Build/SQ3A.220705.003) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36"
+
+    /**
+     * 抖音等平台源站做了防盗链 (Referer) 校验, 缺头会返回 403。
+     * 按视频直链所在域名推导对应的 Referer; 返回 null 时不注入 (走默认)。
+     */
+    private fun refererFor(url: String): String? = when {
+        url.contains("douyinvod") || url.contains("douyin") || url.contains("iesdouyin") ->
+            "https://www.douyin.com/"
+        url.contains("upos-sz") || url.contains("bilivideo") || url.contains("hdslb.com") ->
+            "https://www.bilibili.com/"
+        url.contains("kuaishou") || url.contains("yjsub") ->
+            "https://www.kuaishou.com/"
+        url.contains("ixigua") ->
+            "https://www.ixigua.com/"
+        url.contains("qq.com") ->
+            "https://weishi.qq.com/"
+        else -> null
+    }
+
+    private fun buildRequest(url: String): Request {
+        val builder = Request.Builder().url(url).get()
+            .header("User-Agent", webUserAgent)
+        refererFor(url)?.let { builder.header("Referer", it) }
+        return builder.build()
+    }
+
     private fun parseVideo(link: String): Result<VideoParseResult> = runCatching {
         val url = PARSE_API + "?link=" + java.net.URLEncoder.encode(link, "UTF-8")
         val request = Request.Builder().url(url).get().build()
@@ -174,7 +202,7 @@ object ParseVideo : SwitchFeature() {
         outPath: java.io.File,
         onProgress: (downloaded: Long, total: Long) -> Unit = { _, _ -> },
     ): Result<java.io.File> = runCatching {
-        val request = Request.Builder().url(url).get().build()
+        val request = buildRequest(url)
         httpClient.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) error("下载失败: HTTP ${resp.code}")
             val body = resp.body ?: error("下载内容为空")
