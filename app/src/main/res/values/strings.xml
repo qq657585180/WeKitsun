@@ -3846,6 +3846,11 @@
     <string name="parse_video_no_conversation">No current conversation</string>
     <string name="parse_video_parse_and_send">Parse &amp; Send</string>
     <string name="parse_video_parse">Parse</string>
+    <string name="parse_video_convert">Convert</string>
+    <string name="parse_video_send">Send</string>
+    <string name="parse_video_sending">Sending...</string>
+    <string name="parse_video_auto_reply">Auto-reply @me video links</string>
+    <string name="parse_video_auto_reply_description">When someone @-mentions you in a group chat with a short-video link, automatically parse and send the watermark-free video back</string>
     <string name="parse_video_download">Download</string>
     <string name="parse_video_copy_link">Copy Link</string>
     <string name="parse_video_send_video">Send Video</string>
