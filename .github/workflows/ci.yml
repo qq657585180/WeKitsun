@@ -153,6 +153,20 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: ./gradlew assembleRelease --warning-mode all --stacktrace
 
+      - name: Recompress DEX and re-sign APKs
+        if: github.event_name != 'pull_request'
+        env:
+          WEKIT_KEYSTORE_FILE: ${{ env.WEKIT_KEYSTORE_FILE || format('{0}/wekit-keystore.jks', runner.temp) }}
+          WEKIT_KEYSTORE_PASSWORD: ${{ env.WEKIT_KEYSTORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+          WEKIT_KEY_ALIAS: ${{ env.WEKIT_KEY_ALIAS || secrets.KEY_ALIAS }}
+          WEKIT_KEY_PASSWORD: ${{ env.WEKIT_KEY_PASSWORD || secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for apk in app/build/outputs/apk/*/release/*.apk; do
+            echo "Recompressing and re-signing $apk"
+            cargo xtask apk-recompress --apk "$apk"
+          done
+
       - name: Collect APKs
         run: |
           set -euo pipefail

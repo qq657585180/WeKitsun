@@ -11,6 +11,7 @@
 //!   dex-test [OPTIONS]   Resolve WeKit DexKit targets against desktop APKs.
 //!   dex-test-ci          Prepare APK sources and mutable Dex-Test Release assets.
 //!   i18n-check           Validate the Android English and Chinese resource catalogs.
+//!   apk-recompress        Recompress DEX entries in a release APK and re-sign it.
 //!
 //! Run `cargo xtask <COMMAND> --help` for per-command options.
 
@@ -32,6 +33,7 @@ mod dex_test;
 mod dex_test_ci;
 mod extensions;
 mod i18n_check;
+mod apk_recompress;
 
 // ── Project constants (mirror app/build.gradle.kts / libs.versions.toml) ──────
 
@@ -157,6 +159,9 @@ enum Cmd {
 
     /// Validate the Android English and Chinese resource catalogs.
     I18nCheck,
+
+    /// Recompress DEX entries in a release APK to DEFLATE and re-sign it.
+    ApkRecompress(apk_recompress::ApkRecompressArgs),
 }
 
 #[derive(Args)]
@@ -385,6 +390,7 @@ fn main() -> Result<()> {
         Cmd::DexTestCi(args) => dex_test_ci::task_dex_test_ci(args)?,
         Cmd::I18nCheck => i18n_check::check_repository(&workspace_root())?,
         Cmd::Extensions(args) => extensions::run(&workspace_root(), &args)?,
+        Cmd::ApkRecompress(args) => apk_recompress::run(&args)?,
     }
     Ok(())
 }
