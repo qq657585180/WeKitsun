@@ -29,18 +29,21 @@ import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Video_file
 import dev.ujhhgtg.wekit.R
+import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
+import dev.ujhhgtg.wekit.features.api.core.models.MessageInfo
 import dev.ujhhgtg.wekit.features.api.ui.WeChatInputBarMenuApi
 import dev.ujhhgtg.wekit.features.api.ui.WeCurrentConversationApi
-import dev.ujhhgtg.wekit.features.api.core.WeMessageApi
+import dev.ujhhgtg.wekit.features.core.ClickableFeature
 import dev.ujhhgtg.wekit.features.core.FeatureCategoryIds
 import dev.ujhhgtg.wekit.preferences.WePrefs.Companion.prefOption
-import dev.ujhhgtg.wekit.features.core.SwitchFeature
 import dev.ujhhgtg.wekit.ui.content.AlertDialogContent
 import dev.ujhhgtg.wekit.ui.content.Button
 import dev.ujhhgtg.wekit.ui.content.TextButton
+import dev.ujhhgtg.wekit.ui.content.m3.SwitchWidget
 import dev.ujhhgtg.wekit.ui.utils.showComposeDialog
 import dev.ujhhgtg.wekit.utils.AndroidAudioDecoder
 import dev.ujhhgtg.wekit.utils.AudioUtils
+import dev.ujhhgtg.wekit.utils.HostInfo
 import dev.ujhhgtg.wekit.utils.WeLogger
 import dev.ujhhgtg.wekit.utils.android.copyToClipboard
 import dev.ujhhgtg.wekit.utils.android.readTextFromClipboard
@@ -48,18 +51,24 @@ import dev.ujhhgtg.wekit.utils.android.showToast
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.div
 import dev.ujhhgtg.wekit.utils.fs.KnownPaths
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.util.Collections
+import java.util.LinkedHashSet
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-object ParseVideo : SwitchFeature() {
+object ParseVideo : ClickableFeature() {
 
     override val technicalId = "短视频解析"
     override val nameRes = R.string.feature_parse_video_name
@@ -73,6 +82,7 @@ object ParseVideo : SwitchFeature() {
     private val urlRegex = Regex("""https?://[\w\-._~:/?#\[\]@!$&'()*+,;=%]+""")
 
     private var saveDir by prefOption("parse_video_save_dir", "")
+    private var autoReply by prefOption("parse_video_auto_reply", false)
 
     private fun defaultSaveDir(): String =
         (KnownPaths.downloads / "ParseVideo").absolutePathString()
@@ -104,10 +114,46 @@ object ParseVideo : SwitchFeature() {
 
     override fun onEnable() {
         WeChatInputBarMenuApi.addProvider(provider)
+        WeMessageApi.methodMsgInfoHandleApiInsertMessage.hookBefore {
+            if (!autoReply) return@hookBefore
+            val msgInfo = MessageInfo(args[0]!!)
+            handleAutoReply(msgInfo)
+        }
     }
 
     override fun onDisable() {
         WeChatInputBarMenuApi.removeProvider(provider)
+    }
+
+    override fun onClick(context: androidx.activity.ComponentActivity) {
+        showComposeDialog(context, directlyDismissable = false) {
+            var autoReplyChecked by remember { mutableStateOf(autoReply) }
+            AlertDialogContent(
+                title = { Text(stringResource(R.string.feature_parse_video_name)) },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                    ) {
+                        SwitchWidget(
+                            title = stringResource(R.string.parse_video_auto_reply),
+                            description = stringResource(R.string.parse_video_auto_reply_description),
+                            checked = autoReplyChecked,
+                            onCheckedChange = {
+                                autoReplyChecked = it
+                                autoReply = it
+                            },
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = onDismiss) {
+                        Text(stringResource(R.string.dialog_close))
+                    }
+                },
+            )
+        }
     }
 
     // ==================== 数据模型 ====================
@@ -225,6 +271,80 @@ object ParseVideo : SwitchFeature() {
         outPath
     }
 
+    // ==================== 群聊 @我 自动解析回复 ====================
+
+    /** 临时发送用目录 */
+    private fun tempSendDir(context: android.content.Context): java.io.File {
+        val base = context.cacheDir ?: context.filesDir
+        return java.io.File(base, "parse_video_send")
+    }
+
+    private val autoReplyScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** 打开时信号量的灯以串行化下载，避免并发重复拉取 */
+    private val autoReplyMutex = Mutex()
+
+    /** 记录最近已处理的 (talker, link 摘要) 防止重复回复 */
+    private val autoReplySeen = Collections.synchronizedSet(LinkedHashSet<String>())
+
+    /**
+     * 当某条新消息满足条件时自动触发:
+     * 群聊 + @我 + 非自己发送 + 文本含短视频链接 -> 解析 -> 下载到临时目录 -> 发回该群聊。
+     * 由 hookBefore 在消息入库前调用, 不阻塞入库流程。
+     */
+    private fun handleAutoReply(msgInfo: MessageInfo) {
+        try {
+            if (!msgInfo.isInGroupChat) return
+            if (!msgInfo.isAtMe) return
+            if (msgInfo.type?.isText != true) return
+            if (msgInfo.isSelfSender) return
+
+            val link = extractVideoUrl(msgInfo.humanReadableRepr)
+            if (link.isEmpty()) return
+
+            val dedupKey = "${msgInfo.talker}|$link"
+            if (!autoReplySeen.add(dedupKey)) return
+
+            val talker = msgInfo.talker
+            autoReplyScope.launch {
+                autoReplyMutex.withLock {
+                    doAutoReply(talker, link)
+                }
+            }
+        } catch (e: Exception) {
+            WeLogger.e(TAG, "handleAutoReply failed", e)
+        }
+    }
+
+    /** 真正执行解析 + 下载 + 发送。所有流程在地线程执行, 调用方已持锁。 */
+    private suspend fun doAutoReply(talker: String, link: String) {
+        val context = HostInfo.application
+        val result = runCatching {
+            withContext(Dispatchers.IO) {
+                val parsed = parseVideo(link).getOrElse { throw it }
+                if (parsed.code != 200) {
+                    error("parse failed: ${parsed.msg}")
+                }
+                val data = parsed.parsedData() ?: error("no video data")
+                val url = data.video_link
+                if (url.isBlank()) error("empty video link")
+
+                val dir = tempSendDir(context).apply { mkdirs() }
+                val out = java.io.File(dir, "auto-${UUID.randomUUID()}.mp4")
+                downloadVideo(url, out).getOrElse { throw it }
+
+                val sent = WeMessageApi.sendVideo(talker, out.absolutePath)
+                if (!sent) {
+                    out.delete()
+                    error("sendVideo failed")
+                }
+            }
+        }
+        if (result.isFailure) {
+            WeLogger.e(TAG, "auto reply failed", result.exceptionOrNull() ?: error("auto reply failed"))
+        }
+    }
+
 fun showParseDialog(context: android.content.Context) {
         showComposeDialog(context, directlyDismissable = false) {
             var link by remember { mutableStateOf("") }
@@ -237,6 +357,8 @@ fun showParseDialog(context: android.content.Context) {
             var musicFile by remember { mutableStateOf<java.io.File?>(null) }
             var downloading by remember { mutableStateOf(false) }
             var downloadProgress by remember { mutableFloatStateOf(0f) }
+            var sending by remember { mutableStateOf(false) }
+            var pendingSendAfterParse by remember { mutableStateOf(false) }
             var extractingMusic by remember { mutableStateOf(false) }
             val scope = rememberCoroutineScope()
             val appContext = LocalContext.current.applicationContext
@@ -250,6 +372,49 @@ fun showParseDialog(context: android.content.Context) {
                 }
             }
 
+            fun downloadAndSend(data: VideoData) {
+                val talker = WeCurrentConversationApi.value
+                if (talker.isBlank()) {
+                    pendingSendAfterParse = false
+                    errorMsg = localizedChatInputString(R.string.parse_video_no_conversation)
+                    return
+                }
+                if (sending) return
+                sending = true
+                downloadProgress = 0f
+                errorMsg = null
+                scope.launch {
+                    val saveResult = withContext(Dispatchers.IO) {
+                        val dir = java.io.File(appContext.cacheDir ?: appContext.filesDir, "parse_video_send")
+                            .apply { mkdirs() }
+                        val out = java.io.File(dir, "send-${UUID.randomUUID()}.mp4")
+                        downloadVideo(data.video_link, out) { downloaded, total ->
+                            if (total > 0 && downloaded > 0) {
+                                downloadProgress = (downloaded.toFloat() / total).coerceIn(0f, 1f)
+                            }
+                        }
+                    }
+                    sending = false
+                    saveResult.fold(
+                        onSuccess = { file ->
+                            scope.launch {
+                                val sent = withContext(Dispatchers.IO) { WeMessageApi.sendVideo(talker, file.absolutePath) }
+                                if (sent) {
+                                    showToast(localizedChatInputString(R.string.parse_video_sent))
+                                    onDismiss()
+                                } else {
+                                    errorMsg = localizedChatInputString(R.string.parse_video_send_failed)
+                                }
+                            }
+                        },
+                        onFailure = { e ->
+                            WeLogger.e(TAG, "download for send failed", e)
+                            errorMsg = localizedChatInputString(R.string.parse_video_download_failed, e.message.orEmpty())
+                        },
+                    )
+                }
+            }
+
             fun doParse() {
                 val trimmed = extractVideoUrl(link)
                 if (trimmed.isEmpty()) {
@@ -260,22 +425,44 @@ fun showParseDialog(context: android.content.Context) {
                 errorMsg = null
                 parseResult = null
                 downloadedFile = null
+                musicFile = null
                 scope.launch {
                     val parsed = withContext(Dispatchers.IO) { parseVideo(trimmed) }
                     loading = false
                     parsed.fold(
                         onSuccess = { r ->
                             if (r.code != 200 || r.parsedData()?.video_link.isNullOrBlank()) {
+                                pendingSendAfterParse = false
                                 errorMsg = r.msg.ifBlank { localizedChatInputString(R.string.parse_video_api_error) }
                                 return@fold
                             }
                             parseResult = r
+                            if (pendingSendAfterParse) {
+                                pendingSendAfterParse = false
+                                downloadAndSend(r.parsedData()!!)
+                            }
                         },
                         onFailure = { e ->
+                            pendingSendAfterParse = false
                             WeLogger.e(TAG, "parse failed", e)
                             errorMsg = e.message ?: localizedChatInputString(R.string.parse_video_api_error)
                         },
                     )
+                }
+            }
+
+            fun doConvert() {
+                pendingSendAfterParse = false
+                doParse()
+            }
+
+            fun doSendNow() {
+                val data = parseResult?.parsedData()
+                if (data != null && data.video_link.isNotBlank()) {
+                    downloadAndSend(data)
+                } else {
+                    pendingSendAfterParse = true
+                    doParse()
                 }
             }
 
@@ -401,6 +588,28 @@ fun showParseDialog(context: android.content.Context) {
                             minLines = 2,
                             maxLines = 4,
                         )
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            Button(
+                                onClick = { doConvert() },
+                                modifier = Modifier.weight(1f),
+                                enabled = !loading && !downloading && !sending,
+                            ) {
+                                Text(stringResource(R.string.parse_video_convert))
+                            }
+                            Button(
+                                onClick = { doSendNow() },
+                                modifier = Modifier.weight(1f),
+                                enabled = !loading && !downloading && !sending,
+                            ) {
+                                Text(stringResource(R.string.parse_video_send))
+                            }
+                        }
 
                         Spacer(Modifier.height(8.dp))
 
@@ -545,7 +754,7 @@ fun showParseDialog(context: android.content.Context) {
 
                                 // ===== 下载状态 =====
                                 when {
-                                    downloading -> {
+                                    downloading || sending -> {
                                         Column(modifier = Modifier.fillMaxWidth()) {
                                             val percent = (downloadProgress * 100).toInt()
                                             LinearProgressIndicator(
@@ -554,7 +763,9 @@ fun showParseDialog(context: android.content.Context) {
                                             )
                                             Spacer(Modifier.height(4.dp))
                                             Text(
-                                                text = if (percent >= 100) {
+                                                text = if (sending) {
+                                                    localizedChatInputString(R.string.parse_video_sending)
+                                                } else if (percent >= 100) {
                                                     localizedChatInputString(R.string.parse_video_downloading)
                                                 } else {
                                                     localizedChatInputString(R.string.parse_video_downloading) +
@@ -582,36 +793,29 @@ fun showParseDialog(context: android.content.Context) {
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = onDismiss, enabled = !loading) {
+                    TextButton(onClick = onDismiss, enabled = !loading && !sending) {
                         Text(stringResource(R.string.dialog_cancel))
                     }
                 },
                 confirmButton = {
                     // ===== 按钮组 =====
                     val data = parseResult?.parsedData()
-                    if (data == null) {
-                        Button(
-                            onClick = { doParse() },
-                            enabled = !loading,
-                        ) {
-                            Text(stringResource(R.string.parse_video_parse))
-                        }
-                    } else if (downloadedFile == null) {
+                    if (data != null && downloadedFile == null) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(
                                 onClick = { doDownload() },
-                                enabled = !downloading,
+                                enabled = !downloading && !sending,
                             ) {
                                 Text(stringResource(R.string.parse_video_download))
                             }
                             Button(
                                 onClick = { extractMusic() },
-                                enabled = !extractingMusic,
+                                enabled = !extractingMusic && !sending,
                             ) {
                                 Text(stringResource(R.string.parse_video_download_music))
                             }
                         }
-                    } else {
+                    } else if (data != null) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
