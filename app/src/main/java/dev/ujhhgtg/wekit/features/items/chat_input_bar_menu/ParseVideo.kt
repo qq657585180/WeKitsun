@@ -9,12 +9,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -66,6 +68,9 @@ object ParseVideo : SwitchFeature() {
 
     private const val TAG = "ParseVideo"
     private const val PARSE_API = "https://apis.kit9.cn/api/aggregate_videos/api.php"
+    private const val DEFAULT_BUFFER_SIZE = 8192
+
+    private val urlRegex = Regex("""https?://[\w\-._~:/?#\[\]@!$&'()*+,;=%]+""")
 
     private var saveDir by prefOption("parse_video_save_dir", "")
 
@@ -155,17 +160,40 @@ object ParseVideo : SwitchFeature() {
         }
     }
 
-    private fun downloadVideo(url: String, outPath: java.io.File): Result<java.io.File> = runCatching {
+    /**
+     * 从粘贴的分享文案中提取首个 http(s) 链接。
+     * 抖音/快手等平台复制出来的是整段分享文案（含口令、表情、说明文字），
+     * 直接把整段文本交给解析 API 会因无法识别链接而失败。
+     */
+    private fun extractVideoUrl(raw: String): String {
+        return urlRegex.find(raw)?.value ?: ""
+    }
+
+    private fun downloadVideo(
+        url: String,
+        outPath: java.io.File,
+        onProgress: (downloaded: Long, total: Long) -> Unit = { _, _ -> },
+    ): Result<java.io.File> = runCatching {
         val request = Request.Builder().url(url).get().build()
         httpClient.newCall(request).execute().use { resp ->
             if (!resp.isSuccessful) error("下载失败: HTTP ${resp.code}")
-            resp.body?.byteStream()?.use { input ->
-                outPath.outputStream().use { output ->
-                    input.copyTo(output)
+            val body = resp.body ?: error("下载内容为空")
+            val totalBytes = body.contentLength()
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            outPath.outputStream().use { output ->
+                body.byteStream().use { input ->
+                    var downloaded = 0L
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        downloaded += read
+                        onProgress(downloaded, totalBytes)
+                    }
                 }
-            } ?: error("下载内容为空")
+            }
         }
-        if (outPath.length() < 1024) error("下载文件过小，可能无效") 
+        if (outPath.length() < 1024) error("下载文件过小，可能无效")
         outPath
     }
 
@@ -180,6 +208,7 @@ fun showParseDialog(context: android.content.Context) {
             var downloadedFile by remember { mutableStateOf<java.io.File?>(null) }
             var musicFile by remember { mutableStateOf<java.io.File?>(null) }
             var downloading by remember { mutableStateOf(false) }
+            var downloadProgress by remember { mutableFloatStateOf(0f) }
             var extractingMusic by remember { mutableStateOf(false) }
             val scope = rememberCoroutineScope()
             val appContext = LocalContext.current.applicationContext
@@ -187,13 +216,14 @@ fun showParseDialog(context: android.content.Context) {
             // 自动读取剪贴板中的链接
             androidx.compose.runtime.LaunchedEffect(Unit) {
                 val clip = readTextFromClipboard(appContext) ?: return@LaunchedEffect
-                if (clip.contains(Regex("""(douyin|kuaishou|bilibili|ixigua|pipix|weishi|haokan|weibo|pearvideo|huya|xiaohongshu|v\.qq|quanmin\.kugou)\.?""")) ) {
-                    link = clip
+                val extracted = extractVideoUrl(clip)
+                if (extracted.isNotEmpty()) {
+                    link = extracted
                 }
             }
 
             fun doParse() {
-                val trimmed = link.trim()
+                val trimmed = extractVideoUrl(link)
                 if (trimmed.isEmpty()) {
                     showToast(localizedChatInputString(R.string.parse_video_link_empty))
                     return
@@ -224,12 +254,17 @@ fun showParseDialog(context: android.content.Context) {
             fun doDownload() {
                 val data = parseResult?.parsedData() ?: return
                 downloading = true
+                downloadProgress = 0f
                 errorMsg = null
                 scope.launch {
                     val saveResult = withContext(Dispatchers.IO) {
                         val dir = ensureSaveDir()
                         val out = java.io.File(dir, "video-${UUID.randomUUID()}.mp4")
-                        downloadVideo(data.video_link, out)
+                        downloadVideo(data.video_link, out) { downloaded, total ->
+                            if (total > 0 && downloaded > 0) {
+                                downloadProgress = (downloaded.toFloat() / total).coerceIn(0f, 1f)
+                            }
+                        }
                     }
                     downloading = false
                     saveResult.fold(
@@ -483,13 +518,20 @@ fun showParseDialog(context: android.content.Context) {
                                 // ===== 下载状态 =====
                                 when {
                                     downloading -> {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.padding(end = 8.dp),
-                                                strokeWidth = 2.dp,
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            val percent = (downloadProgress * 100).toInt()
+                                            LinearProgressIndicator(
+                                                progress = { downloadProgress.coerceIn(0f, 1f) },
+                                                modifier = Modifier.fillMaxWidth(),
                                             )
+                                            Spacer(Modifier.height(4.dp))
                                             Text(
-                                                stringResource(R.string.parse_video_downloading),
+                                                text = if (percent >= 100) {
+                                                    localizedChatInputString(R.string.parse_video_downloading)
+                                                } else {
+                                                    localizedChatInputString(R.string.parse_video_downloading) +
+                                                        " $percent%"
+                                                },
                                                 style = MaterialTheme.typography.bodySmall,
                                             )
                                         }
