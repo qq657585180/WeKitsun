@@ -1480,7 +1480,9 @@ private fun VoicePanelContent(
                             }
                             if (mode == TtsMode.FISH_AUDIO || mode == TtsMode.YX520) {
                                 scope.launch {
-                                    engineVoices = MultiEngineTtsClient.fetchVoices(mode.toEngine(), engineApiKey(mode))
+                                    val engine = mode.toEngine()
+                                    engineVoices = if (engine == null) emptyList()
+                                    else MultiEngineTtsClient.fetchVoices(engine, engineApiKeyFor(mode))
                                         .getOrNull()
                                         ?.map { MultiEngineVoiceEntry(it.first, it.second) }
                                         ?: emptyList()
@@ -1511,7 +1513,9 @@ private fun VoicePanelContent(
                         },
                         onRefreshEngineVoices = {
                             scope.launch {
-                                engineVoices = MultiEngineTtsClient.fetchVoices(ttsMode.toEngine(), engineApiKey(ttsMode))
+                                val engine = ttsMode.toEngine()
+                                engineVoices = if (engine == null) emptyList()
+                                else MultiEngineTtsClient.fetchVoices(engine, engineApiKeyFor(ttsMode))
                                     .getOrNull()
                                     ?.map { MultiEngineVoiceEntry(it.first, it.second) }
                                     ?: emptyList()
@@ -3181,7 +3185,6 @@ private fun fallbackAudioMime(path: String): String = when (MediaFileTypeDetecto
     else -> "application/octet-stream"
 }
 
-@Composable
 /** TtsMode → 多引擎 TtsEngine（非多引擎模式返回 null）。 */
 private fun TtsMode.toEngine(): TtsEngine? = when (this) {
     TtsMode.FISH_AUDIO -> TtsEngine.FISH_AUDIO
@@ -3189,6 +3192,15 @@ private fun TtsMode.toEngine(): TtsEngine? = when (this) {
     TtsMode.BYTE_DANCE -> TtsEngine.BYTE_DANCE
     TtsMode.VOCU -> TtsEngine.VOCU
     else -> null
+}
+
+/** 多引擎模式对应的 API Key（从 PanelSettings 读取）。 */
+private fun engineApiKeyFor(mode: TtsMode): String = when (mode) {
+    TtsMode.FISH_AUDIO -> PanelSettings.fishAudioApiKey
+    TtsMode.YX520 -> PanelSettings.yx520ApiKey
+    TtsMode.BYTE_DANCE -> PanelSettings.byteDanceApiKey
+    TtsMode.VOCU -> PanelSettings.vocuApiKey
+    else -> ""
 }
 
 private fun TiaxConfigurePage(onDismiss: () -> Unit) {
@@ -3392,7 +3404,7 @@ private fun MultiEngineConfigurePage(
                     testing = true
                     testResult = null
                     scope.launch {
-                        val engine = mode.toEngine().getOrNull()
+                        val engine = mode.toEngine()
                         val path = PanelPaths.panelCacheDir / "engine-test-${java.util.UUID.randomUUID()}.mp3"
                         val result = if (engine == null) {
                             Result.failure(IllegalStateException("unsupported engine"))
