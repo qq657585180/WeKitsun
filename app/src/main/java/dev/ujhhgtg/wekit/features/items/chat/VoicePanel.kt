@@ -33,6 +33,7 @@ import dev.ujhhgtg.wekit.features.items.chat.panel.voice.VoicePanelRepository
 import dev.ujhhgtg.wekit.features.items.chat.panel.voice.VoiceProviderRegistry
 import dev.ujhhgtg.wekit.ui.panel.VoiceImportMode
 import dev.ujhhgtg.wekit.ui.panel.VoicePanelActions
+import dev.ujhhgtg.wekit.ui.panel.TtsMode
 import dev.ujhhgtg.wekit.ui.panel.showVoicePanelSheet
 import dev.ujhhgtg.wekit.utils.AudioUtils
 import dev.ujhhgtg.wekit.utils.EdgeTtsClient
