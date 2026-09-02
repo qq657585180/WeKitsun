@@ -3870,8 +3870,8 @@
     <string name="parse_video_convert">轉換</string>
     <string name="parse_video_send">傳送</string>
     <string name="parse_video_sending">傳送中...</string>
-    <string name="parse_video_auto_reply">群聊 @我 自動解析連結</string>
-    <string name="parse_video_auto_reply_description">群聊裡有人 @我 並附上短影音連結時，自動解析並直接把去浮水印影片傳回該群聊</string>
+    <string name="parse_video_auto_reply">群聊抖音連結自動解析</string>
+    <string name="parse_video_auto_reply_description">群聊裡有人發抖音分享連結時，自動解析並直接把去浮水印影片傳回該群聊</string>
     <string name="parse_video_download">下载视频</string>
     <string name="parse_video_copy_link">复制直链</string>
     <string name="parse_video_send_video">发送视频</string>
@@ -3887,4 +3887,10 @@
     <string name="parse_video_download_music">下载音乐</string>
     <string name="parse_video_music_downloading">提取音乐中...</string>
     <string name="parse_video_music_downloaded">音乐已提取</string>
+    <string name="parse_video_quality_label">清晰度</string>
+    <string name="parse_video_cover_saved">封面已儲存</string>
+    <string name="parse_video_saving_cover">正在儲存封面…</string>
+    <string name="parse_video_save_cover">儲存封面</string>
+    <string name="parse_video_downloading_music">正在下載音樂…</string>
+    <string name="parse_video_download_music_direct">儲存音樂</string>
     <string name="parse_video_music_download_failed">音乐提取失败</string></resources>

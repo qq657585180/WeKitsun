@@ -7,11 +7,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -23,9 +30,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.composables.icons.materialsymbols.MaterialSymbols
 import com.composables.icons.materialsymbols.outlined.Video_file
 import dev.ujhhgtg.wekit.R
@@ -76,10 +88,22 @@ object ParseVideo : ClickableFeature() {
     override val descriptionRes = R.string.feature_parse_video_description
 
     private const val TAG = "ParseVideo"
+
+    /** 主解析线路：dy.51web.eu.org（抖音多清晰度无水印，token=dyyy）。 */
+    private const val PARSE_API_PRIMARY = "https://dy.51web.eu.org/api/parse"
+    private const val PARSE_API_PRIMARY_TOKEN = "dyyy"
+
+    /** 备用解析线路：kit9 聚合解析（主线路失败时自动切换）。 */
     private const val PARSE_API = "https://apis.kit9.cn/api/aggregate_videos/api.php"
     private const val DEFAULT_BUFFER_SIZE = 8192
 
     private val urlRegex = Regex("""https?://[\w\-._~:/?#\[\]@!$&'()*+,;=%]+""")
+
+    /** 抖音分享链接（v.douyin.com 短链 / www.douyin.com / iesdouyin 等）。 */
+    private val douyinUrlRegex = Regex(
+        """https?://(?:[\w\-.]*douyin\.com|v\.douyin\.com|iesdouyin\.com)/[\w\-._~:/?#\[\]@!$&'()*+,;=%]+""",
+        RegexOption.IGNORE_CASE,
+    )
 
     private var saveDir by prefOption("parse_video_save_dir", "")
     private var autoReply by prefOption("parse_video_auto_reply", false)
@@ -163,6 +187,8 @@ object ParseVideo : ClickableFeature() {
         val code: Int,
         val msg: String,
         val data: JsonElement?,
+        /** 主线路返回的多清晰度列表（备用线路为空）；(label, url) 按清晰度降序。 */
+        val qualityList: List<Pair<String, String>> = emptyList(),
     ) {
         /** 把 data(JsonElement) 解析成 VideoData 对象，兼容 data 为字符串(错误信息)的情况 */
         fun parsedData(): VideoData? {
@@ -192,6 +218,32 @@ object ParseVideo : ClickableFeature() {
         val user_id: String = "",
         val name: String = "",
         val avatar: String = "",
+    )
+
+    // ==================== 主线路（dy.51web.eu.org）数据模型 ====================
+
+    /** 51web 解析响应：{code, msg, data:{title, video_list:[{url,level,isDisclaimer}], cover, music, images}} */
+    @Serializable
+    private data class PrimaryParseResult(
+        val code: Int = 0,
+        val msg: String = "",
+        val data: PrimaryParseData? = null,
+    )
+
+    @Serializable
+    private data class PrimaryParseData(
+        val title: String = "",
+        val cover: String = "",
+        val music: String = "",
+        val video_list: List<PrimaryVideoEntry> = emptyList(),
+        val images: List<String> = emptyList(),
+    )
+
+    @Serializable
+    private data class PrimaryVideoEntry(
+        val url: String = "",
+        val level: String = "",
+        val isDisclaimer: Boolean = false,
     )
 
     // ==================== 解析 + 下载 + 发送 ====================
@@ -225,6 +277,57 @@ object ParseVideo : ClickableFeature() {
     }
 
     private fun parseVideo(link: String): Result<VideoParseResult> = runCatching {
+        // 主线路优先：dy.51web.eu.org（多清晰度无水印）；失败/无有效地址自动回退 kit9 聚合解析
+        parseByPrimary(link).getOrElse { primaryError ->
+            WeLogger.w(TAG, "primary parse failed, fallback to backup: ${primaryError.message}")
+            parseByBackup(link).getOrElse { backupError ->
+                // 两条线路都失败：优先抛备用线路错误（其信息更通用），日志保留主线路原因
+                WeLogger.e(TAG, "backup parse also failed", backupError)
+                throw backupError
+            }
+        }
+    }
+
+    /** 主线路：dy.51web.eu.org。结果映射成统一的 VideoParseResult 供 UI 层无感消费。 */
+    private fun parseByPrimary(link: String): Result<VideoParseResult> = runCatching {
+        val url = PARSE_API_PRIMARY +
+            "?token=" + java.net.URLEncoder.encode(PARSE_API_PRIMARY_TOKEN, "UTF-8") +
+            "&url=" + java.net.URLEncoder.encode(link, "UTF-8")
+        val request = Request.Builder().url(url).get().build()
+        httpClient.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) error("主线路请求失败: HTTP ${resp.code}")
+            val body = resp.body?.string() ?: error("主线路响应为空")
+            val result = json.decodeFromString<PrimaryParseResult>(body)
+            require(result.code == 200) { result.msg.ifBlank { "主线路解析失败 (code=${result.code})" } }
+            val data = result.data ?: error("主线路返回数据为空")
+            // 取第一个有效（非免责声明、http 开头）的视频地址；video_list 按清晰度降序排列
+            val videoUrl = data.video_list
+                .firstOrNull { !it.isDisclaimer && it.url.startsWith("http") }
+                ?.url
+                ?: error("主线路未返回可用视频地址")
+            WeLogger.i(TAG, "primary parse ok, levels=${data.video_list.map { it.level }}")
+            val qualities = data.video_list
+                .filter { !it.isDisclaimer && it.url.startsWith("http") }
+                .map { (it.level.ifBlank { "视频" }) to it.url }
+            VideoParseResult(
+                code = 200,
+                msg = "success",
+                data = json.parseToJsonElement(
+                    json.encodeToString(
+                        VideoData(
+                            video_title = data.title,
+                            video_cover = data.cover,
+                            video_link = videoUrl,
+                        ),
+                    ),
+                ),
+                qualityList = qualities,
+            )
+        }
+    }
+
+    /** 备用线路：kit9 聚合解析（原逻辑不动）。 */
+    private fun parseByBackup(link: String): Result<VideoParseResult> = runCatching {
         val url = PARSE_API + "?link=" + java.net.URLEncoder.encode(link, "UTF-8")
         val request = Request.Builder().url(url).get().build()
         httpClient.newCall(request).execute().use { resp ->
@@ -271,7 +374,7 @@ object ParseVideo : ClickableFeature() {
         outPath
     }
 
-    // ==================== 群聊 @我 自动解析回复 ====================
+    // ==================== 群聊抖音链接自动解析回复 ====================
 
     /** 临时发送用目录 */
     private fun tempSendDir(context: android.content.Context): java.io.File {
@@ -289,17 +392,16 @@ object ParseVideo : ClickableFeature() {
 
     /**
      * 当某条新消息满足条件时自动触发:
-     * 群聊 + @我 + 非自己发送 + 文本含短视频链接 -> 解析 -> 下载到临时目录 -> 发回该群聊。
+     * 群聊 + 非自己发送 + 文本含抖音分享链接 -> 解析 -> 下载到临时目录 -> 发回该群聊。
      * 由 hookBefore 在消息入库前调用, 不阻塞入库流程。
      */
     private fun handleAutoReply(msgInfo: MessageInfo) {
         try {
             if (!msgInfo.isInGroupChat) return
-            if (!msgInfo.isAtMe) return
             if (msgInfo.type?.isText != true) return
             if (msgInfo.isSelfSender) return
 
-            val link = extractVideoUrl(msgInfo.humanReadableRepr)
+            val link = extractDouyinUrl(msgInfo.humanReadableRepr)
             if (link.isEmpty()) return
 
             val dedupKey = "${msgInfo.talker}|$link"
@@ -315,6 +417,10 @@ object ParseVideo : ClickableFeature() {
             WeLogger.e(TAG, "handleAutoReply failed", e)
         }
     }
+
+    /** 从消息文本中提取抖音分享链接；非抖音链接返回空串。 */
+    private fun extractDouyinUrl(raw: String): String =
+        douyinUrlRegex.find(raw)?.value ?: ""
 
     /** 真正执行解析 + 下载 + 发送。所有流程在地线程执行, 调用方已持锁。 */
     private suspend fun doAutoReply(talker: String, link: String) {
@@ -348,13 +454,19 @@ object ParseVideo : ClickableFeature() {
 fun showParseDialog(context: android.content.Context) {
         showComposeDialog(context, directlyDismissable = false) {
             var link by remember { mutableStateOf("") }
-            var saveDirInput by remember { mutableStateOf(currentSaveDir()) }
-            var editingSaveDir by remember { mutableStateOf(false) }
             var loading by remember { mutableStateOf(false) }
             var errorMsg by remember { mutableStateOf<String?>(null) }
             var parseResult by remember { mutableStateOf<VideoParseResult?>(null) }
             var downloadedFile by remember { mutableStateOf<java.io.File?>(null) }
             var musicFile by remember { mutableStateOf<java.io.File?>(null) }
+            // 多清晰度选择：主线路返回的档位列表 + 当前选中 URL（默认第一档=最高清）
+            var qualityList by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+            var selectedQualityUrl by remember { mutableStateOf("") }
+            // 主线路直出的封面/音乐地址（可一键保存）
+            var directCoverUrl by remember { mutableStateOf("") }
+            var directMusicUrl by remember { mutableStateOf("") }
+            var savingCover by remember { mutableStateOf(false) }
+            var downloadingMusic by remember { mutableStateOf(false) }
             var downloading by remember { mutableStateOf(false) }
             var downloadProgress by remember { mutableFloatStateOf(0f) }
             var sending by remember { mutableStateOf(false) }
@@ -426,6 +538,10 @@ fun showParseDialog(context: android.content.Context) {
                 parseResult = null
                 downloadedFile = null
                 musicFile = null
+                qualityList = emptyList()
+                selectedQualityUrl = ""
+                directCoverUrl = ""
+                directMusicUrl = ""
                 scope.launch {
                     val parsed = withContext(Dispatchers.IO) { parseVideo(trimmed) }
                     loading = false
@@ -437,6 +553,16 @@ fun showParseDialog(context: android.content.Context) {
                                 return@fold
                             }
                             parseResult = r
+                            // 多清晰度与直出封面/音乐（仅主线路携带）
+                            qualityList = r.qualityList
+                            selectedQualityUrl = r.qualityList.firstOrNull()?.second ?: r.parsedData()!!.video_link
+                            runCatching {
+                                val d = json.decodeFromString<PrimaryParseData>(
+                                    r.data.toString(),
+                                )
+                                directCoverUrl = d.cover
+                                directMusicUrl = d.music
+                            }
                             if (pendingSendAfterParse) {
                                 pendingSendAfterParse = false
                                 downloadAndSend(r.parsedData()!!)
@@ -613,59 +739,6 @@ fun showParseDialog(context: android.content.Context) {
 
                         Spacer(Modifier.height(8.dp))
 
-                        // ===== 保存位置设置 =====
-                        HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                        Text(
-                            text = stringResource(R.string.parse_video_save_location),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        if (editingSaveDir) {
-                            OutlinedTextField(
-                                value = saveDirInput,
-                                onValueChange = { saveDirInput = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                            )
-                            Row(modifier = Modifier.fillMaxWidth()) {
-                                TextButton(onClick = {
-                                    saveDir = saveDirInput.trim()
-                                    ensureSaveDir()
-                                    editingSaveDir = false
-                                    showToast(localizedChatInputString(R.string.parse_video_save_location_saved))
-                                }) {
-                                    Text(stringResource(R.string.dialog_confirm))
-                                }
-                                TextButton(onClick = {
-                                    saveDirInput = defaultSaveDir()
-                                }) {
-                                    Text(stringResource(R.string.parse_video_save_location_restore))
-                                }
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    text = saveDirInput,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .padding(end = 8.dp),
-                                    maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                )
-                                TextButton(onClick = { editingSaveDir = true }) {
-                                    Text(stringResource(R.string.parse_video_save_location_edit))
-                                }
-                            }
-                        }
-                        HorizontalDivider(Modifier.padding(vertical = 4.dp))
-
-                        Spacer(Modifier.height(8.dp))
-
                         if (loading) {
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                 CircularProgressIndicator(
@@ -685,74 +758,185 @@ fun showParseDialog(context: android.content.Context) {
                             )
                         }
 
-                        // ===== 解析结果信息 =====
+                        // ===== 解析结果卡片（封面 + 信息 + 清晰度 + 保存封面/音乐） =====
                         parseResult?.let { r ->
                             val data = r.parsedData() ?: return@let
                             Spacer(Modifier.height(8.dp))
-                            HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                            Column {
-                                if (data.video_title.isNotBlank()) {
-                                    Text(
-                                        text = data.video_title,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
-                                    )
-                                }
-                                data.author?.let { author ->
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        text = buildString {
-                                            append(author.name)
-                                            if (author.user_id.isNotBlank()) append("  ID:${author.user_id}")
-                                        },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                if (data.video_time > 0) {
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        text = "发布时间: " + java.text.SimpleDateFormat(
-                                            "yyyy-MM-dd HH:mm",
-                                            java.util.Locale.getDefault(),
-                                        ).format(java.util.Date(data.video_time * 1000)),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                if (data.video_id.isNotBlank()) {
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        text = "视频ID: ${data.video_id}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                if (data.video_word.isNotBlank() && data.video_word != "暂无搜索词") {
-                                    Spacer(Modifier.height(2.dp))
-                                    Text(
-                                        text = "大家都在搜: ${data.video_word}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                }
-                                Spacer(Modifier.height(6.dp))
-                                Text(
-                                    text = "视频直链",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(
-                                    text = data.video_link,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    maxLines = 2,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                )
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Column(Modifier.padding(12.dp)) {
+                                    Row(verticalAlignment = Alignment.Top) {
+                                        if (directCoverUrl.isNotBlank()) {
+                                            AsyncImage(
+                                                model = directCoverUrl,
+                                                contentDescription = null,
+                                                modifier = Modifier
+                                                    .size(width = 108.dp, height = 144.dp)
+                                                    .clip(RoundedCornerShape(10.dp)),
+                                                contentScale = ContentScale.Crop,
+                                            )
+                                            Spacer(Modifier.width(12.dp))
+                                        }
+                                        Column(Modifier.weight(1f)) {
+                                            if (data.video_title.isNotBlank()) {
+                                                Text(
+                                                    text = data.video_title,
+                                                    style = MaterialTheme.typography.titleSmall,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    maxLines = 4,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                            data.author?.let { author ->
+                                                Spacer(Modifier.height(4.dp))
+                                                Text(
+                                                    text = author.name,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
+                                            }
+                                            if (qualityList.size > 1) {
+                                                Spacer(Modifier.height(8.dp))
+                                                var expanded by remember { mutableStateOf(false) }
+                                                val selectedLabel = qualityList
+                                                    .firstOrNull { it.second == selectedQualityUrl }?.first
+                                                    ?: qualityList.firstOrNull()?.first
+                                                    ?: "选择清晰度"
+                                                ExposedDropdownMenuBox(
+                                                    expanded = expanded,
+                                                    onExpandedChange = { expanded = it },
+                                                ) {
+                                                    OutlinedTextField(
+                                                        value = selectedLabel,
+                                                        onValueChange = {},
+                                                        readOnly = true,
+                                                        label = { Text(stringResource(R.string.parse_video_quality_label)) },
+                                                        trailingIcon = {
+                                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                                                        },
+                                                        modifier = Modifier
+                                                            .menuAnchor()
+                                                            .fillMaxWidth(),
+                                                    )
+                                                    ExposedDropdownMenu(
+                                                        expanded = expanded,
+                                                        onDismissRequest = { expanded = false },
+                                                    ) {
+                                                        qualityList.forEach { (label, url) ->
+                                                            DropdownMenuItem(
+                                                                text = { Text(label) },
+                                                                onClick = {
+                                                                    selectedQualityUrl = url
+                                                                    expanded = false
+                                                                },
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(Modifier.height(10.dp))
+
+                                    if (directCoverUrl.isNotBlank() || directMusicUrl.isNotBlank()) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            if (directCoverUrl.isNotBlank()) {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        savingCover = true
+                                                        scope.launch {
+                                                            val result = withContext(Dispatchers.IO) {
+                                                                runCatching {
+                                                                    val dir = ensureSaveDir()
+                                                                    val ext = if (directCoverUrl.contains(".png")) "png" else "jpg"
+                                                                    val out = java.io.File(dir, "cover-${'$'}{UUID.randomUUID()}.$ext")
+                                                                    val req = Request.Builder().url(directCoverUrl).get().build()
+                                                                    httpClient.newCall(req).execute().use { resp ->
+                                                                        require(resp.isSuccessful) { "HTTP ${'$'}{resp.code}" }
+                                                                        resp.body.byteStream().use { ins ->
+                                                                            out.outputStream().use { ins.copyTo(it) }
+                                                                        }
+                                                                    }
+                                                                    out
+                                                                }
+                                                            }
+                                                            savingCover = false
+                                                            result.fold(
+                                                                onSuccess = { file ->
+                                                                    showToast(
+                                                                        localizedChatInputString(R.string.parse_video_cover_saved) +
+                                                                            " (${'$'}{"%.1f".format(file.length() / 1024.0))}KB)",
+                                                                    )
+                                                                },
+                                                                onFailure = { e ->
+                                                                    WeLogger.e(TAG, "save cover failed", e)
+                                                                    errorMsg = e.message ?: "保存封面失败"
+                                                                },
+                                                            )
+                                                        }
+                                                    },
+                                                    enabled = !savingCover,
+                                                ) {
+                                                    Text(
+                                                        if (savingCover) stringResource(R.string.parse_video_saving_cover)
+                                                        else stringResource(R.string.parse_video_save_cover),
+                                                    )
+                                                }
+                                            }
+                                            if (directMusicUrl.isNotBlank()) {
+                                                OutlinedButton(
+                                                    onClick = {
+                                                        downloadingMusic = true
+                                                        scope.launch {
+                                                            val result = withContext(Dispatchers.IO) {
+                                                                runCatching {
+                                                                    val dir = ensureSaveDir()
+                                                                    val out = java.io.File(dir, "music-${'$'}{UUID.randomUUID()}.mp3")
+                                                                    val req = buildRequest(directMusicUrl)
+                                                                    httpClient.newCall(req).execute().use { resp ->
+                                                                        require(resp.isSuccessful) { "HTTP ${'$'}{resp.code}" }
+                                                                        resp.body.byteStream().use { ins ->
+                                                                            out.outputStream().use { ins.copyTo(it) }
+                                                                        }
+                                                                    }
+                                                                    out
+                                                                }
+                                                            }
+                                                            downloadingMusic = false
+                                                            result.fold(
+                                                                onSuccess = { file ->
+                                                                    showToast(
+                                                                        localizedChatInputString(R.string.parse_video_music_downloaded) +
+                                                                            ": ${'$'}{"%.1f".format(file.length() / 1024.0 / 1024.0)}MB",
+                                                                    )
+                                                                },
+                                                                onFailure = { e ->
+                                                                    WeLogger.e(TAG, "download music failed", e)
+                                                                    errorMsg = e.message ?: "下载音乐失败"
+                                                                },
+                                                            )
+                                                        }
+                                                    },
+                                                    enabled = !downloadingMusic,
+                                                ) {
+                                                    Text(
+                                                        if (downloadingMusic) stringResource(R.string.parse_video_downloading_music)
+                                                        else stringResource(R.string.parse_video_download_music_direct),
+                                                    )
+                                                }
+                                            }
+                                        }
+                                        Spacer(Modifier.height(8.dp))
+                                    }
 
                                 Spacer(Modifier.height(8.dp))
 
                                 // ===== 下载状态 =====
+
                                 when {
                                     downloading || sending -> {
                                         Column(modifier = Modifier.fillMaxWidth()) {
@@ -789,6 +973,7 @@ fun showParseDialog(context: android.content.Context) {
                                     }
                                 }
                             }
+                        }
                         }
                     }
                 },
