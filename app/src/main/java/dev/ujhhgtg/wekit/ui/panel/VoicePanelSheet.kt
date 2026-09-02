@@ -3203,6 +3203,7 @@ private fun engineApiKeyFor(mode: TtsMode): String = when (mode) {
     else -> ""
 }
 
+@Composable
 private fun TiaxConfigurePage(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     var apiKey by remember { mutableStateOf(PanelSettings.tiaxApiKey) }
