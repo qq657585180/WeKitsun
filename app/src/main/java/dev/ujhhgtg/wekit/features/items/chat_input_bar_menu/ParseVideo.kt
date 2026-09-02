@@ -1,6 +1,7 @@
 package dev.ujhhgtg.wekit.features.items.chat_input_bar_menu
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -10,13 +11,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -805,23 +809,24 @@ fun showParseDialog(context: android.content.Context) {
                                                     .firstOrNull { it.second == selectedQualityUrl }?.first
                                                     ?: qualityList.firstOrNull()?.first
                                                     ?: "选择清晰度"
-                                                ExposedDropdownMenuBox(
-                                                    expanded = expanded,
-                                                    onExpandedChange = { expanded = it },
-                                                ) {
+                                                Box {
                                                     OutlinedTextField(
                                                         value = selectedLabel,
                                                         onValueChange = {},
                                                         readOnly = true,
                                                         label = { Text(stringResource(R.string.parse_video_quality_label)) },
                                                         trailingIcon = {
-                                                            ExposedDropdownMenuDefaults.TrailingIcon(expanded)
+                                                            IconButton(onClick = { expanded = !expanded }) {
+                                                                Icon(
+                                                                    if (expanded) MaterialSymbols.Outlined.Keyboard_arrow_up
+                                                                    else MaterialSymbols.Outlined.Keyboard_arrow_down,
+                                                                    null,
+                                                                )
+                                                            }
                                                         },
-                                                        modifier = Modifier
-                                                            .menuAnchor()
-                                                            .fillMaxWidth(),
+                                                        modifier = Modifier.fillMaxWidth(),
                                                     )
-                                                    ExposedDropdownMenu(
+                                                    DropdownMenu(
                                                         expanded = expanded,
                                                         onDismissRequest = { expanded = false },
                                                     ) {
@@ -853,10 +858,10 @@ fun showParseDialog(context: android.content.Context) {
                                                                 runCatching {
                                                                     val dir = ensureSaveDir()
                                                                     val ext = if (directCoverUrl.contains(".png")) "png" else "jpg"
-                                                                    val out = java.io.File(dir, "cover-${'$'}{UUID.randomUUID()}.$ext")
+                                                                    val out = java.io.File(dir, "cover-${UUID.randomUUID()}.$ext")
                                                                     val req = Request.Builder().url(directCoverUrl).get().build()
                                                                     httpClient.newCall(req).execute().use { resp ->
-                                                                        require(resp.isSuccessful) { "HTTP ${'$'}{resp.code}" }
+                                                                        require(resp.isSuccessful) { "HTTP ${resp.code}" }
                                                                         resp.body.byteStream().use { ins ->
                                                                             out.outputStream().use { ins.copyTo(it) }
                                                                         }
@@ -869,7 +874,7 @@ fun showParseDialog(context: android.content.Context) {
                                                                 onSuccess = { file ->
                                                                     showToast(
                                                                         localizedChatInputString(R.string.parse_video_cover_saved) +
-                                                                            " (${'$'}{"%.1f".format(file.length() / 1024.0))}KB)",
+                                                                            " (${"%.1f".format(file.length() / 1024.0)}KB)",
                                                                     )
                                                                 },
                                                                 onFailure = { e ->
@@ -895,10 +900,10 @@ fun showParseDialog(context: android.content.Context) {
                                                             val result = withContext(Dispatchers.IO) {
                                                                 runCatching {
                                                                     val dir = ensureSaveDir()
-                                                                    val out = java.io.File(dir, "music-${'$'}{UUID.randomUUID()}.mp3")
+                                                                    val out = java.io.File(dir, "music-${UUID.randomUUID()}.mp3")
                                                                     val req = buildRequest(directMusicUrl)
                                                                     httpClient.newCall(req).execute().use { resp ->
-                                                                        require(resp.isSuccessful) { "HTTP ${'$'}{resp.code}" }
+                                                                        require(resp.isSuccessful) { "HTTP ${resp.code}" }
                                                                         resp.body.byteStream().use { ins ->
                                                                             out.outputStream().use { ins.copyTo(it) }
                                                                         }
@@ -911,7 +916,7 @@ fun showParseDialog(context: android.content.Context) {
                                                                 onSuccess = { file ->
                                                                     showToast(
                                                                         localizedChatInputString(R.string.parse_video_music_downloaded) +
-                                                                            ": ${'$'}{"%.1f".format(file.length() / 1024.0 / 1024.0)}MB",
+                                                                            ": ${"%.1f".format(file.length() / 1024.0 / 1024.0)}MB",
                                                                     )
                                                                 },
                                                                 onFailure = { e ->

@@ -353,9 +353,9 @@ fun SettingsPager(onOpenLicense: () -> Unit) {
                 item {
                     PrefArrow(
                         title = stringResource(R.string.brand_github),
-                        summary = "Ujhhgtg/WeKit",
+                        summary = "qq657585180/WeKitsun",
                         icon = GitHubIcon,
-                        onClick = { "https://github.com/Ujhhgtg/WeKit".toUri().openInSystem(context, true) })
+                        onClick = { "https://github.com/qq657585180/WeKitsun".toUri().openInSystem(context, true) })
                 }
                 item {
                     PrefArrow(
