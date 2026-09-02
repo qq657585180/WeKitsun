@@ -1565,6 +1565,15 @@
     <string name="tts_mode_clone">克隆语音</string>
     <string name="tts_mode_edge">Edge TTS</string>
     <string name="tts_mode_tiax">tiax 音色</string>
+    <string name="tts_mode_fish">FishAudio 音色</string>
+    <string name="tts_mode_yx520">语星音色</string>
+    <string name="tts_mode_byte">豆包音色</string>
+    <string name="tts_mode_vocu">VoCu 音色</string>
+    <string name="tts_refresh_voices">刷新音色</string>
+    <string name="tts_engine_voices_empty">尚未获取到音色，请点「刷新音色」，并确认已在设置中填写 API Key。</string>
+    <string name="multi_engine_configure_title">%1$s 设置</string>
+    <string name="multi_engine_voice_id_label">音色 ID / speaker</string>
+    <string name="multi_engine_voice_id_hint_list">音色 ID（面板列表可拉取音色）</string>
     <string name="tts_mode_system">系统 TTS</string>
     <string name="tts_manage_tiax">管理 tiax</string>
     <string name="tts_text_counter">%1$d/%2$d</string>

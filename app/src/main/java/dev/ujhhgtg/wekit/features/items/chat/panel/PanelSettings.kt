@@ -50,6 +50,16 @@ object PanelSettings {
     var selectedEdgeVoice by prefOption("voice_panel_edge_voice", "zh-CN-XiaoxiaoNeural")
     var tiaxApiKey by prefOption("voice_tiax_apikey", "")
     var tiaxVoiceIndex by prefOption("voice_tiax_vidx", 0)
+
+    // 多引擎 TTS（移植自 WeAgent AI语音助手脚本）
+    var fishAudioApiKey by prefOption("voice_fish_apikey", "")
+    var fishAudioVoiceId by prefOption("voice_fish_vid", "")
+    var yx520ApiKey by prefOption("voice_yx_apikey", "")
+    var yx520VoiceId by prefOption("voice_yx_vid", "")
+    var byteDanceApiKey by prefOption("voice_bv_apikey", "")
+    var byteDanceSpeaker by prefOption("voice_bv_speaker", "zh_female_vv_uranus_bigtts")
+    var vocuApiKey by prefOption("voice_vocu_apikey", "")
+    var vocuVoiceId by prefOption("voice_vocu_vid", "")
     var voiceDirectoryUrl by prefOption("voice_directory_url", "")
     var funBoxApiClientWxId by prefOption(
         "funbox_api_client_wxid",

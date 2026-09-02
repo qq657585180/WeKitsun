@@ -115,6 +115,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import dev.ujhhgtg.wekit.ui.utils.ListItem
 import dev.ujhhgtg.wekit.ui.utils.ReorderableList
 import dev.ujhhgtg.wekit.utils.TiaxTtsClient
+import dev.ujhhgtg.wekit.utils.MultiEngineTtsClient
+import dev.ujhhgtg.wekit.utils.TtsEngine
+import dev.ujhhgtg.wekit.ui.panel.MultiEngineVoiceEntry
 import dev.ujhhgtg.wekit.utils.serialization.DefaultJson
 
 data class VoicePanelActions(
@@ -158,6 +161,12 @@ data class VoicePanelActions(
         Result.failure(UnsupportedOperationException())
     },
     val synthesizeTiax: suspend (String, Int) -> Result<Unit> = { _, _ ->
+        Result.failure(UnsupportedOperationException())
+    },
+    val convertEngine: suspend (String, TtsMode, String) -> Result<VoicePreview> = { _, _, _ ->
+        Result.failure(UnsupportedOperationException())
+    },
+    val synthesizeEngine: suspend (String, TtsMode, String) -> Result<Unit> = { _, _, _ ->
         Result.failure(UnsupportedOperationException())
     },
     val loadClones: suspend () -> List<CloneVoice> = { emptyList() },
@@ -285,7 +294,22 @@ private fun VoicePanelContent(
     var ttsText by remember { mutableStateOf("") }
     var selectedEdgeVoice by remember { mutableStateOf(PanelSettings.selectedEdgeVoice) }
     var selectedTiaxVoiceIndex by remember { mutableStateOf(PanelSettings.tiaxVoiceIndex) }
+
+    // 多引擎 TTS 状态（FISH_AUDIO/YX520/BYTE_DANCE/VOCU）
+    var engineVoices by remember { mutableStateOf<List<MultiEngineVoiceEntry>>(emptyList()) }
+    var selectedEngineVoiceId by remember {
+        mutableStateOf(
+            when (rememberedNavigation?.ttsMode) {
+                TtsMode.FISH_AUDIO -> PanelSettings.fishAudioVoiceId
+                TtsMode.YX520 -> PanelSettings.yx520VoiceId
+                TtsMode.BYTE_DANCE -> PanelSettings.byteDanceSpeaker
+                TtsMode.VOCU -> PanelSettings.vocuVoiceId
+                else -> ""
+            },
+        )
+    }
     var tiaxConfigureOpen by remember { mutableStateOf(false) }
+    var engineConfigureOpen by remember { mutableStateOf(false) }
     var convertedTts by remember { mutableStateOf<VoicePreview?>(null) }
     var convertedTtsTitle by remember { mutableStateOf<PanelUiText?>(null) }
     var clones by remember { mutableStateOf<List<CloneVoice>>(emptyList()) }
@@ -821,6 +845,8 @@ private fun VoicePanelContent(
                         TtsMode.EDGE -> actions.convertEdge(ttsText, selectedEdgeVoice)
                         TtsMode.CLONE -> actions.convertClone(ttsText, selectedClone!!)
                         TtsMode.TIAX -> actions.convertTiax(ttsText, selectedTiaxVoiceIndex)
+                        TtsMode.FISH_AUDIO, TtsMode.YX520, TtsMode.BYTE_DANCE, TtsMode.VOCU ->
+                            actions.convertEngine(ttsText, ttsMode, selectedEngineVoiceId)
                     }
                     progressMessage = null
                     result.onSuccess { preview ->
@@ -1440,7 +1466,27 @@ private fun VoicePanelContent(
                         selectedClone = selectedClone,
                         selectedEdgeVoice = selectedEdgeVoice,
                         selectedTiaxVoiceIndex = selectedTiaxVoiceIndex,
-                        onModeChange = { clearConvertedTts(); ttsMode = it },
+                        engineVoices = engineVoices,
+                        selectedEngineVoiceId = selectedEngineVoiceId,
+                        onModeChange = { mode ->
+                            clearConvertedTts()
+                            ttsMode = mode
+                            selectedEngineVoiceId = when (mode) {
+                                TtsMode.FISH_AUDIO -> PanelSettings.fishAudioVoiceId
+                                TtsMode.YX520 -> PanelSettings.yx520VoiceId
+                                TtsMode.BYTE_DANCE -> PanelSettings.byteDanceSpeaker
+                                TtsMode.VOCU -> PanelSettings.vocuVoiceId
+                                else -> selectedEngineVoiceId
+                            }
+                            if (mode == TtsMode.FISH_AUDIO || mode == TtsMode.YX520) {
+                                scope.launch {
+                                    engineVoices = MultiEngineTtsClient.fetchVoices(mode.toEngine(), engineApiKey(mode))
+                                        .getOrNull()
+                                        ?.map { MultiEngineVoiceEntry(it.first, it.second) }
+                                        ?: emptyList()
+                                }
+                            }
+                        },
                         onTextChange = { clearConvertedTts(); ttsText = it },
                         onSelectEdgeVoice = { voice ->
                             clearConvertedTts()
@@ -1452,8 +1498,31 @@ private fun VoicePanelContent(
                             selectedTiaxVoiceIndex = index
                             PanelSettings.tiaxVoiceIndex = index
                         },
+                        onSelectEngineVoice = { id ->
+                            clearConvertedTts()
+                            selectedEngineVoiceId = id
+                            when (ttsMode) {
+                                TtsMode.FISH_AUDIO -> PanelSettings.fishAudioVoiceId = id
+                                TtsMode.YX520 -> PanelSettings.yx520VoiceId = id
+                                TtsMode.BYTE_DANCE -> PanelSettings.byteDanceSpeaker = id
+                                TtsMode.VOCU -> PanelSettings.vocuVoiceId = id
+                                else -> {}
+                            }
+                        },
+                        onRefreshEngineVoices = {
+                            scope.launch {
+                                engineVoices = MultiEngineTtsClient.fetchVoices(ttsMode.toEngine(), engineApiKey(ttsMode))
+                                    .getOrNull()
+                                    ?.map { MultiEngineVoiceEntry(it.first, it.second) }
+                                    ?: emptyList()
+                            }
+                        },
                         onChooseOrManage = {
-                            if (ttsMode == TtsMode.TIAX) tiaxConfigureOpen = true else managingClones = true
+                            when (ttsMode) {
+                                TtsMode.TIAX -> tiaxConfigureOpen = true
+                                TtsMode.BYTE_DANCE, TtsMode.VOCU -> engineConfigureOpen = true
+                                else -> managingClones = true
+                            }
                         },
                         onConvert = ::convertTts,
                         onPreviewConverted = {
@@ -1483,6 +1552,8 @@ private fun VoicePanelContent(
                                                 ),
                                             )
                                         TtsMode.TIAX -> actions.synthesizeTiax(ttsText, selectedTiaxVoiceIndex)
+                                        TtsMode.FISH_AUDIO, TtsMode.YX520, TtsMode.BYTE_DANCE, TtsMode.VOCU ->
+                                            actions.synthesizeEngine(ttsText, ttsMode, selectedEngineVoiceId)
                                     }
                                     progressMessage = null
                                     showToastSuspend(
@@ -1800,6 +1871,13 @@ private fun VoicePanelContent(
         if (tiaxConfigureOpen) {
             TiaxConfigurePage(
                 onDismiss = { tiaxConfigureOpen = false },
+            )
+        }
+
+        if (engineConfigureOpen) {
+            MultiEngineConfigurePage(
+                mode = ttsMode,
+                onDismiss = { engineConfigureOpen = false },
             )
         }
 
@@ -3104,6 +3182,15 @@ private fun fallbackAudioMime(path: String): String = when (MediaFileTypeDetecto
 }
 
 @Composable
+/** TtsMode → 多引擎 TtsEngine（非多引擎模式返回 null）。 */
+private fun TtsMode.toEngine(): TtsEngine? = when (this) {
+    TtsMode.FISH_AUDIO -> TtsEngine.FISH_AUDIO
+    TtsMode.YX520 -> TtsEngine.YX520
+    TtsMode.BYTE_DANCE -> TtsEngine.BYTE_DANCE
+    TtsMode.VOCU -> TtsEngine.VOCU
+    else -> null
+}
+
 private fun TiaxConfigurePage(onDismiss: () -> Unit) {
     val scope = rememberCoroutineScope()
     var apiKey by remember { mutableStateOf(PanelSettings.tiaxApiKey) }
@@ -3192,6 +3279,151 @@ private fun TiaxConfigurePage(onDismiss: () -> Unit) {
         testResult?.let { (success, message) ->
             Text(
                 message,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+}
+
+/**
+ * 多引擎 TTS（FishAudio/语星/豆包/VoCu）配置页 — 移植自 WeAgent AI语音助手脚本的引擎配置。
+ * FISH_AUDIO/YX520：API Key（音色由 ys.php 拉取，面板里点「刷新音色」）；
+ * BYTE_DANCE/VOCU：API Key + 音色 ID/speaker 手动填写。
+ */
+@Composable
+private fun MultiEngineConfigurePage(
+    mode: TtsMode,
+    onDismiss: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var apiKey by remember {
+        mutableStateOf(
+            when (mode) {
+                TtsMode.FISH_AUDIO -> PanelSettings.fishAudioApiKey
+                TtsMode.YX520 -> PanelSettings.yx520ApiKey
+                TtsMode.BYTE_DANCE -> PanelSettings.byteDanceApiKey
+                else -> PanelSettings.vocuApiKey
+            },
+        )
+    }
+    var voiceId by remember {
+        mutableStateOf(
+            when (mode) {
+                TtsMode.FISH_AUDIO -> PanelSettings.fishAudioVoiceId
+                TtsMode.YX520 -> PanelSettings.yx520VoiceId
+                TtsMode.BYTE_DANCE -> PanelSettings.byteDanceSpeaker
+                else -> PanelSettings.vocuVoiceId
+            },
+        )
+    }
+    var testing by remember { mutableStateOf(false) }
+    var testResult by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+
+    val titleText = when (mode) {
+        TtsMode.FISH_AUDIO -> "FishAudio"
+        TtsMode.YX520 -> stringResource(R.string.tts_mode_yx520)
+        TtsMode.BYTE_DANCE -> stringResource(R.string.tts_mode_byte)
+        else -> stringResource(R.string.tts_mode_vocu)
+    }
+
+    PanelPageOverlay(onDismiss = onDismiss, onBack = onDismiss) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onDismiss) {
+                Icon(MaterialSymbols.Outlined.Arrow_back, stringResource(R.string.panel_action_back))
+            }
+            Text(
+                stringResource(R.string.multi_engine_configure_title, titleText),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.weight(1f),
+            )
+            IconButton(onClick = onDismiss) {
+                Icon(MaterialSymbols.Outlined.Close, stringResource(R.string.dialog_close))
+            }
+        }
+        OutlinedTextField(
+            value = apiKey,
+            onValueChange = {
+                apiKey = it
+                when (mode) {
+                    TtsMode.FISH_AUDIO -> PanelSettings.fishAudioApiKey = it.trim()
+                    TtsMode.YX520 -> PanelSettings.yx520ApiKey = it.trim()
+                    TtsMode.BYTE_DANCE -> PanelSettings.byteDanceApiKey = it.trim()
+                    else -> PanelSettings.vocuApiKey = it.trim()
+                }
+                testResult = null
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text(stringResource(R.string.tiax_apikey_label)) },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = voiceId,
+            onValueChange = {
+                voiceId = it
+                when (mode) {
+                    TtsMode.FISH_AUDIO -> PanelSettings.fishAudioVoiceId = it.trim()
+                    TtsMode.YX520 -> PanelSettings.yx520VoiceId = it.trim()
+                    TtsMode.BYTE_DANCE -> PanelSettings.byteDanceSpeaker = it.trim()
+                    else -> PanelSettings.vocuVoiceId = it.trim()
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+            label = {
+                Text(
+                    if (mode == TtsMode.BYTE_DANCE || mode == TtsMode.VOCU) {
+                        stringResource(R.string.multi_engine_voice_id_label)
+                    } else {
+                        stringResource(R.string.multi_engine_voice_id_hint_list)
+                    },
+                )
+            },
+            singleLine = true,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(
+                onClick = {
+                    val key = apiKey.trim()
+                    val vid = voiceId.trim()
+                    if (key.isBlank() || vid.isBlank()) {
+                        testResult = false to ""
+                        return@OutlinedButton
+                    }
+                    testing = true
+                    testResult = null
+                    scope.launch {
+                        val engine = mode.toEngine().getOrNull()
+                        val path = PanelPaths.panelCacheDir / "engine-test-${java.util.UUID.randomUUID()}.mp3"
+                        val result = if (engine == null) {
+                            Result.failure(IllegalStateException("unsupported engine"))
+                        } else {
+                            try {
+                                MultiEngineTtsClient.synthesizeToMp3(engine, "测试", path, vid, key)
+                                    .map { path.toFile().length() }
+                            } finally {
+                                path.deleteIfExists()
+                            }
+                        }
+                        testing = false
+                        testResult = result.fold(
+                            onSuccess = { size -> true to "$size B" },
+                            onFailure = { false to (it.message ?: "unknown") },
+                        )
+                    }
+                },
+                enabled = !testing,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(if (testing) stringResource(R.string.tiax_testing) else stringResource(R.string.tiax_test_connection))
+            }
+            Button(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.action_save))
+            }
+        }
+        testResult?.let { (success, message) ->
+            Text(
+                if (success) stringResource(R.string.tiax_connection_success, message)
+                else stringResource(R.string.tiax_connection_failed, message.ifEmpty { stringResource(R.string.tiax_apikey_required) }),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
             )

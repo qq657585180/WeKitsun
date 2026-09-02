@@ -36,7 +36,10 @@ import dev.ujhhgtg.wekit.features.items.chat.EDGE_TTS_VOICES
 import dev.ujhhgtg.wekit.features.items.chat.panel.CloneVoice
 import dev.ujhhgtg.wekit.features.items.chat.panel.voice.TIAX_PRESET_VOICES
 
-internal enum class TtsMode { SYSTEM, EDGE, CLONE, TIAX }
+internal enum class TtsMode { SYSTEM, EDGE, CLONE, TIAX, FISH_AUDIO, YX520, BYTE_DANCE, VOCU }
+
+/** 多引擎 TTS 音色条目（FISH_AUDIO/YX520 由 ys.php 拉取，BYTE_DANCE/VOCU 手动输入）。 */
+internal data class MultiEngineVoiceEntry(val id: String, val name: String)
 
 @Composable
 internal fun TtsContent(
@@ -46,10 +49,14 @@ internal fun TtsContent(
     selectedClone: CloneVoice?,
     selectedEdgeVoice: String,
     selectedTiaxVoiceIndex: Int,
+    engineVoices: List<MultiEngineVoiceEntry>,
+    selectedEngineVoiceId: String,
     onModeChange: (TtsMode) -> Unit,
     onTextChange: (String) -> Unit,
     onSelectEdgeVoice: (String) -> Unit,
     onSelectTiaxVoice: (Int) -> Unit,
+    onSelectEngineVoice: (String) -> Unit,
+    onRefreshEngineVoices: () -> Unit,
     onChooseOrManage: () -> Unit,
     onConvert: () -> Unit,
     onPreviewConverted: () -> Unit,
@@ -67,6 +74,10 @@ internal fun TtsContent(
                 item { TtsModeOption(stringResource(R.string.tts_mode_edge), mode == TtsMode.EDGE) { onModeChange(TtsMode.EDGE) } }
                 item { TtsModeOption(stringResource(R.string.tts_mode_clone), mode == TtsMode.CLONE) { onModeChange(TtsMode.CLONE) } }
                 item { TtsModeOption(stringResource(R.string.tts_mode_tiax), mode == TtsMode.TIAX) { onModeChange(TtsMode.TIAX) } }
+                item { TtsModeOption(stringResource(R.string.tts_mode_fish), mode == TtsMode.FISH_AUDIO) { onModeChange(TtsMode.FISH_AUDIO) } }
+                item { TtsModeOption(stringResource(R.string.tts_mode_yx520), mode == TtsMode.YX520) { onModeChange(TtsMode.YX520) } }
+                item { TtsModeOption(stringResource(R.string.tts_mode_byte), mode == TtsMode.BYTE_DANCE) { onModeChange(TtsMode.BYTE_DANCE) } }
+                item { TtsModeOption(stringResource(R.string.tts_mode_vocu), mode == TtsMode.VOCU) { onModeChange(TtsMode.VOCU) } }
             }
         }
         item {
@@ -124,6 +135,57 @@ internal fun TtsContent(
                         )
                     },
                 )
+            }
+        } else if (mode == TtsMode.FISH_AUDIO || mode == TtsMode.YX520) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(stringResource(R.string.tts_choose_voice), style = MaterialTheme.typography.titleSmall)
+                    OutlinedButton(onClick = onRefreshEngineVoices) { Text(stringResource(R.string.tts_refresh_voices)) }
+                }
+            }
+            if (engineVoices.isEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.tts_engine_voices_empty),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+            itemsIndexed(engineVoices, key = { _, v -> v.id }) { _, voice ->
+                ListItem(
+                    modifier = Modifier.clickable { onSelectEngineVoice(voice.id) },
+                    colors = panelListItemColors(),
+                    content = { Text(voice.name) },
+                    leadingContent = {
+                        RadioButton(
+                            selected = selectedEngineVoiceId == voice.id,
+                            onClick = { onSelectEngineVoice(voice.id) },
+                        )
+                    },
+                )
+            }
+        } else if (mode == TtsMode.BYTE_DANCE || mode == TtsMode.VOCU) {
+            item {
+                Column {
+                    Text(stringResource(R.string.tts_current_voice), style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        selectedEngineVoiceId.ifEmpty { stringResource(R.string.panel_none) },
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    OutlinedButton(onClick = onChooseOrManage) { Text(stringResource(R.string.tts_choose_or_manage_voice)) }
+                }
             }
         } else if (mode == TtsMode.CLONE) {
             item {

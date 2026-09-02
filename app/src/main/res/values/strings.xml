@@ -1598,6 +1598,15 @@
     <string name="tts_mode_clone">Cloned voice</string>
     <string name="tts_mode_edge">Edge TTS</string>
     <string name="tts_mode_tiax">tiax Voice</string>
+    <string name="tts_mode_fish">FishAudio Voice</string>
+    <string name="tts_mode_yx520">YX520 Voice</string>
+    <string name="tts_mode_byte">Doubao Voice</string>
+    <string name="tts_mode_vocu">VoCu Voice</string>
+    <string name="tts_refresh_voices">Refresh voices</string>
+    <string name="tts_engine_voices_empty">No voices loaded. Tap refresh, and check the API key in settings.</string>
+    <string name="multi_engine_configure_title">%1$s settings</string>
+    <string name="multi_engine_voice_id_label">Voice ID / speaker</string>
+    <string name="multi_engine_voice_id_hint_list">Voice ID (voices load in panel list)</string>
     <string name="tts_manage_tiax">Manage tiax</string>
     <string name="tts_mode_system">System TTS</string>
     <string name="tts_text_counter">%1$d/%2$d</string>

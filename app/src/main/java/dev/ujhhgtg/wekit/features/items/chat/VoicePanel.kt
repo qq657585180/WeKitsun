@@ -38,6 +38,8 @@ import dev.ujhhgtg.wekit.utils.AudioUtils
 import dev.ujhhgtg.wekit.utils.EdgeTtsClient
 import dev.ujhhgtg.wekit.utils.MediaFileTypeDetector
 import dev.ujhhgtg.wekit.utils.TiaxTtsClient
+import dev.ujhhgtg.wekit.utils.MultiEngineTtsClient
+import dev.ujhhgtg.wekit.utils.TtsEngine
 import dev.ujhhgtg.wekit.utils.coerceToInt
 import dev.ujhhgtg.wekit.utils.fs.asPath
 import kotlinx.coroutines.CancellationException
@@ -171,6 +173,8 @@ object VoicePanel : SwitchFeature() {
         convertSystem = { text -> synthesizeSystemPreview(context, text) },
         convertTiax = { text, voiceIndex -> synthesizeTiaxPreview(text, voiceIndex) },
         synthesizeTiax = { text, voiceIndex -> synthesizeTiaxAndSend(WeCurrentConversationApi.value, text, voiceIndex) },
+        convertEngine = { text, mode, voiceId -> synthesizeEnginePreview(mode, text, voiceId) },
+        synthesizeEngine = { text, mode, voiceId -> synthesizeEngineAndSend(WeCurrentConversationApi.value, mode, text, voiceId) },
         loadClones = { withContext(Dispatchers.IO) { CloneVoiceRepository.load() } },
         selectedCloneId = { withContext(Dispatchers.IO) { CloneVoiceRepository.selectedId() } },
         selectClone = { withContext(Dispatchers.IO) { CloneVoiceRepository.select(it) } },
@@ -354,6 +358,48 @@ object VoicePanel : SwitchFeature() {
         createGeneratedPreview("tiax", "mp3") { path ->
             TiaxTtsClient.synthesizeToMp3(text, path, voiceIndex, PanelSettings.tiaxApiKey).getOrThrow()
         }
+
+    private fun TtsMode.toEngineOrNull(): TtsEngine? = when (this) {
+        TtsMode.FISH_AUDIO -> TtsEngine.FISH_AUDIO
+        TtsMode.YX520 -> TtsEngine.YX520
+        TtsMode.BYTE_DANCE -> TtsEngine.BYTE_DANCE
+        TtsMode.VOCU -> TtsEngine.VOCU
+        else -> null
+    }
+
+    private fun engineApiKey(mode: TtsMode): String = when (mode) {
+        TtsMode.FISH_AUDIO -> PanelSettings.fishAudioApiKey
+        TtsMode.YX520 -> PanelSettings.yx520ApiKey
+        TtsMode.BYTE_DANCE -> PanelSettings.byteDanceApiKey
+        TtsMode.VOCU -> PanelSettings.vocuApiKey
+        else -> ""
+    }
+
+    private fun engineTitle(mode: TtsMode): String = when (mode) {
+        TtsMode.FISH_AUDIO -> "FishAudio"
+        TtsMode.YX520 -> "语星语音"
+        TtsMode.BYTE_DANCE -> "豆包语音"
+        TtsMode.VOCU -> "VoCu"
+        else -> "tts"
+    }
+
+    private suspend fun synthesizeEnginePreview(mode: TtsMode, text: String, voiceId: String): Result<VoicePreview> {
+        val engine = mode.toEngineOrNull() ?: return Result.failure(IllegalStateException("不支持的引擎模式"))
+        return createGeneratedPreview("engine-${engine.name.lowercase()}", "mp3") { path ->
+            MultiEngineTtsClient.synthesizeToMp3(engine, text, path, voiceId, engineApiKey(mode)).getOrThrow()
+        }
+    }
+
+    private suspend fun synthesizeEngineAndSend(
+        talker: String,
+        mode: TtsMode,
+        text: String,
+        voiceId: String,
+    ): Result<Unit> {
+        val engine = mode.toEngineOrNull() ?: return Result.failure(IllegalStateException("不支持的引擎模式"))
+        val title = engineTitle(mode)
+        return synthesizeAndSend(talker, title) { synthesizeEnginePreview(mode, text, voiceId) }
+    }
 
     private suspend fun synthesizeAndSend(
         talker: String,
