@@ -584,11 +584,11 @@ private fun NukeAboutPage(
                 NukeDivider()
                 NukePreferenceRow(
                     title = stringResource(R.string.brand_telegram),
-                    description = "https://t.me/+7j5dJ6g16B43OWVl",
+                    description = "https://t.me/+bcdb3j7qPgw0NDE9",
                     leading = { NukeVectorCategoryIcon(TelegramIcon) },
                     trailing = { NukeCountAndChevron(text = null) },
                     onClick = {
-                        "https://t.me/+7j5dJ6g16B43OWVl".toUri().openInSystem(context, true)
+                        "https://t.me/+bcdb3j7qPgw0NDE9".toUri().openInSystem(context, true)
                     },
                 )
                 NukeDivider()
