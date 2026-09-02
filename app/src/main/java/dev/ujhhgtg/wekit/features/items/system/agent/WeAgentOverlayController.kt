@@ -3,6 +3,8 @@ package dev.ujhhgtg.wekit.features.items.system.agent
 import android.content.Context
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.Gravity
 import android.view.KeyEvent
@@ -49,11 +51,17 @@ object WeAgentOverlayController {
     /** 悬浮球默认贴边隐藏开关（对应 Miss-WeChat 的 wc_music_player_start_hidden）。 */
     const val PREF_BALL_DOCK_TO_EDGE_KEY = "weagent_ball_dock_to_edge"
 
-    /** 贴边时悬浮球与屏幕边缘的间距（dp）。 */
-    private const val EDGE_MARGIN_DP = 8
+    /** 贴边隐藏时悬浮球露出的窄边宽度（dp），其余部分移出屏幕。 */
+    private const val EDGE_VISIBLE_DP = 10
+
+    /** 贴边吸附滑入动画步数与每步间隔（ms）。 */
+    private const val DOCK_ANIM_STEPS = 8
+    private const val DOCK_ANIM_STEP_MS = 16L
 
     private val wm: WindowManager
         get() = HostInfo.application.getSystemService<WindowManager>()
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private var ballView: ComposeView? = null
     private var ballParams: WindowManager.LayoutParams? = null
@@ -81,7 +89,7 @@ object WeAgentOverlayController {
     private var dockToEdge = false
 
     /**
-     * 切换悬浮球贴边隐藏。开启时立即将当前球吸附到最近边缘；关闭时保持原位。
+     * 切换悬浮球贴边隐藏。开启时立即将当前球收起到最近边缘（滑入动画）；关闭时展开回全可见位置。
      * 必须在主线程调用。
      */
     fun setDockToEdge(enabled: Boolean) {
@@ -91,8 +99,14 @@ object WeAgentOverlayController {
         val v = ballView ?: return
         val p = ballParams ?: return
         if (enabled) {
-            snapToNearestEdge(v, p)
-            runCatching { wm.updateViewLayout(v, p) }
+            val target = dockedTargetX(v, p, nearestEdgeOf(v, p))
+            animateXTo(v, p, target)
+            WePrefs.putInt(PREF_BALL_X, target)
+        } else {
+            val target = expandedTargetX(v, p)
+            animateXTo(v, p, target)
+            // 关闭贴边时持久化展开位置，避免下次 attach 从负 x 恢复导致球不可见
+            WePrefs.putInt(PREF_BALL_X, target)
         }
     }
 
@@ -170,6 +184,9 @@ object WeAgentOverlayController {
             gravity = Gravity.TOP or Gravity.START
             x = WePrefs.getIntOrDef(PREF_BALL_X, 24)
             y = WePrefs.getIntOrDef(PREF_BALL_Y, 240)
+            // 允许窗口移出屏幕边界：贴边隐藏时球大部移出屏幕，只留窄边。
+            // 若无此 flag，FLAG_LAYOUT_IN_SCREEN 会把负 x 裁剪回 0，导致"靠边不隐藏"。
+            flags = flags or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
         }
         ballParams = params
         val owner = LifecycleOwnerProvider.lifecycleOwner
@@ -179,7 +196,17 @@ object WeAgentOverlayController {
                 InjectedUiTheme {
                     WeAgentBall(
                         state = WeAgentService.ballState.value,
-                        onClick = { togglePanel() },
+                        onClick = {
+                            // 贴边收起状态（大部在屏幕外）下点击先展开球；完全可见时才开面板
+                            val v0 = ballView
+                            val p0 = ballParams
+                            if (dockToEdge && v0 != null && p0 != null && isDockedHidden(v0, p0)) {
+                                animateXTo(v0, p0, expandedTargetX(v0, p0))
+                                WePrefs.putInt(PREF_BALL_X, p0.x)
+                            } else {
+                                togglePanel()
+                            }
+                        },
                         onDragStart = {
                             ballParams?.let { dragStartX = it.x; dragStartY = it.y }
                         },
@@ -197,14 +224,18 @@ object WeAgentOverlayController {
                             val v = ballView
                             if (v != null) {
                                 if (dockToEdge) {
-                                    snapToNearestEdge(v, p)
+                                    val edge = nearestEdgeOf(v, p)
+                                    val target = dockedTargetX(v, p, edge)
+                                    // y 保持拖动结束位置；x 滑入到贴边收起位
+                                    animateXTo(v, p, target)
+                                    WePrefs.putInt(PREF_BALL_X, target)
                                 } else {
                                     clampToScreen(v, p)
+                                    runCatching { wm.updateViewLayout(v, p) }
+                                    WePrefs.putInt(PREF_BALL_X, p.x)
                                 }
-                                runCatching { wm.updateViewLayout(v, p) }
+                                WePrefs.putInt(PREF_BALL_Y, p.y)
                             }
-                            WePrefs.putInt(PREF_BALL_X, p.x)
-                            WePrefs.putInt(PREF_BALL_Y, p.y)
                         },
                     )
                 }
@@ -212,10 +243,16 @@ object WeAgentOverlayController {
         }
         ballView = view
         wm.addView(view, params)
-        // 每次打开微信（attach）时，若开启贴边则默认收起到右侧边缘
+        // 每次打开微信（attach）时，若开启贴边则默认收起到右边缘（只露窄边）
         if (dockToEdge) {
-            snapToRightEdge(params)
+            val target = dockedTargetX(view, params, nearestEdgeOf(view, params))
+            animateXTo(view, params, target)
+        } else if (params.x < 0 || isDockedHidden(view, params)) {
+            // 关闭贴边但残留收起位置：展开回完全可见
+            val target = expandedTargetX(view, params)
+            params.x = target
             runCatching { wm.updateViewLayout(view, params) }
+            WePrefs.putInt(PREF_BALL_X, target)
         }
     }
 
@@ -228,27 +265,85 @@ object WeAgentOverlayController {
         params.y = params.y.coerceIn(0, (metrics.heightPixels - h).coerceAtLeast(0))
     }
 
-    /**
-     * 将悬浮球吸附到最近的左/右边缘（贴边隐藏）。对应 Miss-WeChat 的 hideToEdge。
-     */
-    private fun snapToNearestEdge(view: View, params: WindowManager.LayoutParams) {
+    /** 悬浮球宽度（未布局时回退 52dp）。 */
+    private fun ballWidth(view: View): Int {
         val metrics = view.resources.displayMetrics
-        val w = if (view.width > 0) view.width else (52 * metrics.density).toInt()
+        return if (view.width > 0) view.width else (52 * metrics.density).toInt()
+    }
+
+    /** 球是否处于贴边收起状态（露出宽度 < 球宽的一半）。 */
+    private fun isDockedHidden(view: View, params: WindowManager.LayoutParams): Boolean {
+        val metrics = view.resources.displayMetrics
+        val w = ballWidth(view)
+        val visible = when {
+            params.x < 0 -> params.x + w               // 左缘收起：露出部分 = x + w
+            params.x + w > metrics.widthPixels -> metrics.widthPixels - params.x // 右缘收起
+            else -> w                                   // 完全在屏幕内
+        }
+        return visible < w / 2
+    }
+
+    private const val EDGE_LEFT = 0
+    private const val EDGE_RIGHT = 1
+
+    /** 判断悬浮球当前更靠近哪一边。 */
+    private fun nearestEdgeOf(view: View, params: WindowManager.LayoutParams): Int {
+        val metrics = view.resources.displayMetrics
+        val w = ballWidth(view)
         val centerX = params.x + w / 2f
-        val rightEdgeX = metrics.widthPixels - w - (EDGE_MARGIN_DP * metrics.density).toInt()
-        params.x = if (centerX < metrics.widthPixels / 2f) {
-            (EDGE_MARGIN_DP * metrics.density).toInt()
+        return if (centerX < metrics.widthPixels / 2f) EDGE_LEFT else EDGE_RIGHT
+    }
+
+    /**
+     * 贴边收起后的目标 x：球大部移出屏幕，只露 [EDGE_VISIBLE_DP] 窄边。
+     * 左缘：x = 窄边宽 - 球宽（负值）；右缘：x = 屏宽 - 窄边宽。
+     */
+    private fun dockedTargetX(view: View, params: WindowManager.LayoutParams, edge: Int): Int {
+        val metrics = view.resources.displayMetrics
+        val w = ballWidth(view)
+        val visible = (EDGE_VISIBLE_DP * metrics.density).toInt()
+        return if (edge == EDGE_LEFT) {
+            visible - w
         } else {
-            rightEdgeX.coerceAtLeast(0)
+            metrics.widthPixels - visible
         }
     }
 
-    /** 将悬浮球收起到屏幕右边缘（默认贴边位置）。 */
-    private fun snapToRightEdge(params: WindowManager.LayoutParams) {
-        val v = ballView ?: return
-        val metrics = v.resources.displayMetrics
-        val w = if (v.width > 0) v.width else (52 * metrics.density).toInt()
-        params.x = (metrics.widthPixels - w - (EDGE_MARGIN_DP * metrics.density).toInt()).coerceAtLeast(0)
+    /** 展开后的目标 x：完全可见（与屏幕边缘留出与窄边等宽的呼吸边距）。 */
+    private fun expandedTargetX(view: View, params: WindowManager.LayoutParams): Int {
+        val metrics = view.resources.displayMetrics
+        val w = ballWidth(view)
+        val margin = (EDGE_VISIBLE_DP * metrics.density).toInt()
+        return if (nearestEdgeOf(view, params) == EDGE_LEFT) {
+            margin
+        } else {
+            (metrics.widthPixels - w - margin).coerceAtLeast(0)
+        }
+    }
+
+    /**
+     * X 轴插值滑入/滑出动画：把窗口从当前 x 平滑移动到 [targetX]。
+     * 每步 updateViewLayout；动画期间的新调用会取消上一次（removeCallbacksAndMessages）。
+     */
+    private fun animateXTo(
+        view: View,
+        params: WindowManager.LayoutParams,
+        targetX: Int,
+        steps: Int = DOCK_ANIM_STEPS,
+    ) {
+        val from = params.x
+        if (from == targetX) return
+        mainHandler.removeCallbacksAndMessages(null)
+        for (i in 1..steps) {
+            val frac = i.toFloat() / steps
+            val stepX = (from + (targetX - from) * frac).toInt()
+            mainHandler.postDelayed({
+                if (view.parent != null && ballParams === params) {
+                    params.x = stepX
+                    runCatching { wm.updateViewLayout(view, params) }
+                }
+            }, i * DOCK_ANIM_STEP_MS)
+        }
     }
 
     // -----------------------------------------------------------------------------------------
