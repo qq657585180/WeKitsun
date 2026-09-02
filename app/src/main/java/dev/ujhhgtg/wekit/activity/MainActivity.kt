@@ -815,8 +815,8 @@ class MainActivity : ComponentActivity() {
                 LinkCard(
                     icon = TelegramIcon,
                     title = stringResource(R.string.brand_telegram),
-                    subtitle = "https://t.me/+7j5dJ6g16B43OWVl",
-                    onClick = { onUrlClick("https://t.me/+7j5dJ6g16B43OWVl") }
+                    subtitle = "https://t.me/+bcdb3j7qPgw0NDE9",
+                    onClick = { onUrlClick("https://t.me/+bcdb3j7qPgw0NDE9") }
                 )
             }
 

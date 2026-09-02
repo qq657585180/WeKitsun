@@ -329,21 +329,6 @@ fun SettingsPager(onOpenLicense: () -> Unit) {
                 }
                 item {
                     PrefArrow(
-                        title = stringResource(R.string.settings_donate_title),
-                        summary = stringResource(R.string.settings_donate_summary),
-                        icon = MaterialSymbols.Outlined.Volunteer_activism,
-                        onClick = {
-//                        context.startActivity(Intent().apply {
-//                            setClassName(HostInfo.packageName, "${PackageNames.WECHAT}.plugin.collect.reward.ui.QrRewardSelectMoneyUI")
-//                            putExtra("key_qrcode_url", "m0n#Z7LGW*s4AVH!z'd(?)")
-//                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-//                        })
-                            "https://ifdian.net/a/ujhhgtg".toUri().openInSystem(context, true)
-                        },
-                    )
-                }
-                item {
-                    PrefArrow(
                         title = stringResource(R.string.settings_open_source_licenses_title),
                         summary = stringResource(R.string.settings_open_source_licenses_summary),
                         icon = MaterialSymbols.Outlined.License,
@@ -360,9 +345,9 @@ fun SettingsPager(onOpenLicense: () -> Unit) {
                 item {
                     PrefArrow(
                         title = stringResource(R.string.brand_telegram),
-                        summary = "https://t.me/+7j5dJ6g16B43OWVl",
+                        summary = "https://t.me/+bcdb3j7qPgw0NDE9",
                         icon = TelegramIcon,
-                        onClick = { "https://t.me/+7j5dJ6g16B43OWVl".toUri().openInSystem(context, true) })
+                        onClick = { "https://t.me/+bcdb3j7qPgw0NDE9".toUri().openInSystem(context, true) })
                 }
             }
         }
