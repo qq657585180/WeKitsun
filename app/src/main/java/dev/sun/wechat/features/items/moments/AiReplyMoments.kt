@@ -36,7 +36,7 @@ import dev.sun.wechat.features.api.ui.WeMomentsApi
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
 import dev.sun.wechat.i18n.LocalWeKitLocalizedContext
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.ContactsSelector
@@ -89,24 +89,24 @@ object AiReplyMoments : ClickableFeature(),
             "只输出评论本身，不要解释，不要引号。"
 
     // ---- 配置 ----
-    var prompt by WePrefs.prefOption("ai_reply_moments_prompt", "")
-    var temperature by WePrefs.prefOption("ai_reply_moments_temperature", 0.7f)
-    var maxTokens by WePrefs.prefOption("ai_reply_moments_max_tokens", 128)
-    var maxCommentLength by WePrefs.prefOption("ai_reply_moments_max_comment_length", 200)
-    var listMode by WePrefs.prefOption("ai_reply_moments_list_mode", LIST_ALL)
-    var processMode by WePrefs.prefOption("ai_reply_moments_process_mode", MODE_WHEN_SEEN)
-    var replyIntervalMs by WePrefs.prefOption("ai_reply_moments_interval_ms", 0L)
-    var autoRefresh by WePrefs.prefOption("ai_reply_moments_auto_refresh", false)
-    var refreshIntervalMin by WePrefs.prefOption("ai_reply_moments_refresh_interval_min", 30)
-    var maxAgeDays by WePrefs.prefOption("ai_reply_moments_max_age_days", 30)
+    var prompt by KvStore.prefOption("ai_reply_moments_prompt", "")
+    var temperature by KvStore.prefOption("ai_reply_moments_temperature", 0.7f)
+    var maxTokens by KvStore.prefOption("ai_reply_moments_max_tokens", 128)
+    var maxCommentLength by KvStore.prefOption("ai_reply_moments_max_comment_length", 200)
+    var listMode by KvStore.prefOption("ai_reply_moments_list_mode", LIST_ALL)
+    var processMode by KvStore.prefOption("ai_reply_moments_process_mode", MODE_WHEN_SEEN)
+    var replyIntervalMs by KvStore.prefOption("ai_reply_moments_interval_ms", 0L)
+    var autoRefresh by KvStore.prefOption("ai_reply_moments_auto_refresh", false)
+    var refreshIntervalMin by KvStore.prefOption("ai_reply_moments_refresh_interval_min", 30)
+    var maxAgeDays by KvStore.prefOption("ai_reply_moments_max_age_days", 30)
 
     private var whitelist: Set<String>
-        get() = WePrefs.getStringSetOrDef(KEY_WHITELIST, emptySet())
-        set(v) = WePrefs.putStringSet(KEY_WHITELIST, v)
+        get() = KvStore.getStringSetOrDef(KEY_WHITELIST, emptySet())
+        set(v) = KvStore.putStringSet(KEY_WHITELIST, v)
 
     private var blacklist: Set<String>
-        get() = WePrefs.getStringSetOrDef(KEY_BLACKLIST, emptySet())
-        set(v) = WePrefs.putStringSet(KEY_BLACKLIST, v)
+        get() = KvStore.getStringSetOrDef(KEY_BLACKLIST, emptySet())
+        set(v) = KvStore.putStringSet(KEY_BLACKLIST, v)
 
     private const val KEY_WHITELIST = "ai_reply_moments_whitelist"
     private const val KEY_BLACKLIST = "ai_reply_moments_blacklist"
@@ -129,7 +129,7 @@ object AiReplyMoments : ClickableFeature(),
         WeDatabaseListenerApi.addListener(this)
         // 从持久化重载已评论记录，避免微信/模块重启后重复评论所有朋友圈
         handledSnsIds.clear()
-        runCatching { handledSnsIds.addAll(WePrefs.getStringSetOrDef(KEY_COMMENTED, emptySet())) }
+        runCatching { handledSnsIds.addAll(KvStore.getStringSetOrDef(KEY_COMMENTED, emptySet())) }
         lastAttemptAt.clear()
         if (processMode == MODE_ALL_LOADED) scanCachedMoments()
         startRefreshJob()
@@ -270,7 +270,7 @@ object AiReplyMoments : ClickableFeature(),
     }
 
     private fun persistCommented() {
-        runCatching { WePrefs.putStringSet(KEY_COMMENTED, handledSnsIds.toSet()) }
+        runCatching { KvStore.putStringSet(KEY_COMMENTED, handledSnsIds.toSet()) }
             .onFailure { WeLogger.w(TAG, "persist commented snsIds failed", it) }
     }
 

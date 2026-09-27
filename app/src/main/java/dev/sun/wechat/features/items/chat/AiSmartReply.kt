@@ -45,8 +45,8 @@ import dev.sun.wechat.features.api.ui.WeChatMessageContextMenuApi
 import dev.sun.wechat.features.api.ui.WeChatMessageContextMenuApi.MenuItem
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
-import dev.sun.wechat.preferences.WePrefs.Companion.prefOption
+import dev.sun.wechat.data.KvStore
+import dev.sun.wechat.data.KvStore.prefOption
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.TextButton
@@ -82,7 +82,7 @@ object AiSmartReply : ClickableFeature(),
 
     /** 风格提示词: 优先用户改过的, 否则内置默认 */
     private fun currentPromptFor(name: String): String =
-        WePrefs.getStringOrDef(
+        KvStore.getStringOrDef(
             stylePromptKey(name),
             STYLES.firstOrNull { it.first == name }?.second ?: "",
         )
@@ -203,7 +203,7 @@ object AiSmartReply : ClickableFeature(),
                 loading = true
                 error = null
                 // 保存该风格的提示词修改
-                WePrefs.putString(stylePromptKey(selectedStyle), stylePromptInput.trim())
+                KvStore.putString(stylePromptKey(selectedStyle), stylePromptInput.trim())
                 // 换一批: 先清空旧候选, 生成中显示思考态
                 candidates = emptyList()
                 candidates = generateCandidates(msgInfo.talker, text, selectedStyle, stylePromptInput.trim())

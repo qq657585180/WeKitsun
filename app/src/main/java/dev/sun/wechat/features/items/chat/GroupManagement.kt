@@ -31,7 +31,7 @@ import dev.sun.wechat.features.api.core.models.MessageType
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
 import dev.sun.wechat.i18n.LocalWeKitLocalizedContext
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.ContactsSelector
@@ -96,41 +96,41 @@ object GroupManagement : ClickableFeature(), WeDatabaseListenerApi.IInsertListen
     const val ACTION_KICK_AND_BAN = 3
 
     // 配置
-    var groups by WePrefs.prefOption("glg_groups_json", "")
-    var banned by WePrefs.prefOption("glg_banned_json", "")
-    var exempt by WePrefs.prefOption("glg_exempt_json", "")
-    var cooldownMs by WePrefs.prefOption("glg_cooldown_ms", 60_000L)
-    var action by WePrefs.prefOption("glg_action", ACTION_KICK_AND_HINT)
-    var hintText by WePrefs.prefOption("glg_hint_text", DEFAULT_HINT)
-    var detectTextLink by WePrefs.prefOption("glg_detect_text_link", true)
-    var detectCardLink by WePrefs.prefOption("glg_detect_card_link", true)
-    var detectMiniApp by WePrefs.prefOption("glg_detect_miniapp", true)
-    var detectContactCard by WePrefs.prefOption("glg_detect_contact_card", true)
-    var detectImage by WePrefs.prefOption("glg_detect_image", false)
-    var detectVideo by WePrefs.prefOption("glg_detect_video", false)
-    var detectVoice by WePrefs.prefOption("glg_detect_voice", false)
-    var detectFile by WePrefs.prefOption("glg_detect_file", false)
-    var maxTextLength by WePrefs.prefOption("glg_max_text_length", 300)
-    var nightEnabled by WePrefs.prefOption("glg_night_enabled", false)
-    var nightStartHour by WePrefs.prefOption("glg_night_start_hour", 23)
-    var nightEndHour by WePrefs.prefOption("glg_night_end_hour", 7)
-    var nightHintText by WePrefs.prefOption("glg_night_hint_text", DEFAULT_NIGHT_HINT)
+    var groups by KvStore.prefOption("glg_groups_json", "")
+    var banned by KvStore.prefOption("glg_banned_json", "")
+    var exempt by KvStore.prefOption("glg_exempt_json", "")
+    var cooldownMs by KvStore.prefOption("glg_cooldown_ms", 60_000L)
+    var action by KvStore.prefOption("glg_action", ACTION_KICK_AND_HINT)
+    var hintText by KvStore.prefOption("glg_hint_text", DEFAULT_HINT)
+    var detectTextLink by KvStore.prefOption("glg_detect_text_link", true)
+    var detectCardLink by KvStore.prefOption("glg_detect_card_link", true)
+    var detectMiniApp by KvStore.prefOption("glg_detect_miniapp", true)
+    var detectContactCard by KvStore.prefOption("glg_detect_contact_card", true)
+    var detectImage by KvStore.prefOption("glg_detect_image", false)
+    var detectVideo by KvStore.prefOption("glg_detect_video", false)
+    var detectVoice by KvStore.prefOption("glg_detect_voice", false)
+    var detectFile by KvStore.prefOption("glg_detect_file", false)
+    var maxTextLength by KvStore.prefOption("glg_max_text_length", 300)
+    var nightEnabled by KvStore.prefOption("glg_night_enabled", false)
+    var nightStartHour by KvStore.prefOption("glg_night_start_hour", 23)
+    var nightEndHour by KvStore.prefOption("glg_night_end_hour", 7)
+    var nightHintText by KvStore.prefOption("glg_night_hint_text", DEFAULT_NIGHT_HINT)
 
     // ---- 进退群监控 ----
-    var notifyEnabled by WePrefs.prefOption("glg_notify_enabled", false)
-    var welcomeText by WePrefs.prefOption("glg_welcome_text", "欢迎新成员入群！")
-    var leaveText by WePrefs.prefOption("glg_leave_text", "")
+    var notifyEnabled by KvStore.prefOption("glg_notify_enabled", false)
+    var welcomeText by KvStore.prefOption("glg_welcome_text", "欢迎新成员入群！")
+    var leaveText by KvStore.prefOption("glg_leave_text", "")
     // 卡片模式：进退群发图片卡片（头像+通知文本），关闭则用下方纯文本
-    var cardEnabled by WePrefs.prefOption("glg_card_enabled", false)
-    var newbieKickEnabled by WePrefs.prefOption("glg_newbie_kick", false)
-    var newbieMinutes by WePrefs.prefOption("glg_newbie_minutes", 10)
-    var floodEnabled by WePrefs.prefOption("glg_flood_enabled", false)
-    var floodWindowSec by WePrefs.prefOption("glg_flood_window_sec", 60)
-    var floodCount by WePrefs.prefOption("glg_flood_count", 10)
-    var atAllEnabled by WePrefs.prefOption("glg_atall_enabled", false)
-    var ownerExempt by WePrefs.prefOption("glg_owner_exempt", true)
-    var ladderEnabled by WePrefs.prefOption("glg_ladder_enabled", false)
-    var rules by WePrefs.prefOption("glg_rules", "")
+    var cardEnabled by KvStore.prefOption("glg_card_enabled", false)
+    var newbieKickEnabled by KvStore.prefOption("glg_newbie_kick", false)
+    var newbieMinutes by KvStore.prefOption("glg_newbie_minutes", 10)
+    var floodEnabled by KvStore.prefOption("glg_flood_enabled", false)
+    var floodWindowSec by KvStore.prefOption("glg_flood_window_sec", 60)
+    var floodCount by KvStore.prefOption("glg_flood_count", 10)
+    var atAllEnabled by KvStore.prefOption("glg_atall_enabled", false)
+    var ownerExempt by KvStore.prefOption("glg_owner_exempt", true)
+    var ladderEnabled by KvStore.prefOption("glg_ladder_enabled", false)
+    var rules by KvStore.prefOption("glg_rules", "")
 
     private const val DEFAULT_HINT = "群内禁止发送链接和小程序，已自动移出群聊。"
     private const val DEFAULT_NIGHT_HINT = "禁言时段内发言，已自动移出群聊。"

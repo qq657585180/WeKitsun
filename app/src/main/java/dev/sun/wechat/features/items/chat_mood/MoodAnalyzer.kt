@@ -1,6 +1,6 @@
 package dev.sun.wechat.features.items.chat_mood
 
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.utils.WeLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -26,8 +26,8 @@ object MoodAnalyzer {
     private val failureMessages = ConcurrentHashMap<String, String>()
     private val refreshListeners = CopyOnWriteArrayList<() -> Unit>()
 
-    var enabled by WePrefs.prefOption("mood_enabled", false)
-    var showBadge by WePrefs.prefOption("mood_show_badge", true)
+    var enabled by KvStore.prefOption("mood_enabled", false)
+    var showBadge by KvStore.prefOption("mood_show_badge", true)
     val header = "情绪分析"
 
     /** 界面层注册：某条消息分析完成/失败时触发重绘。 */

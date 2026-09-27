@@ -46,7 +46,7 @@ import dev.sun.wechat.features.items.chat.FloatingChatFooter.PANEL_TOP_RESERVE_D
 import dev.sun.wechat.features.items.chat.FloatingChatFooter.maxPanelHeight
 import dev.sun.wechat.features.items.chat.FloatingChatFooter.movePanelAbove
 import dev.sun.wechat.features.items.chat.FloatingChatFooter.offscreenHeight
-import dev.sun.wechat.preferences.WePrefs.Companion.prefOption
+import dev.sun.wechat.data.KvStore.prefOption
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.TextButton
 import dev.sun.wechat.ui.content.m3.BaseItemContainer

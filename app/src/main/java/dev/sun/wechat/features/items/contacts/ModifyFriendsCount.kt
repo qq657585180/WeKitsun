@@ -24,7 +24,7 @@ import dev.sun.wechat.R
 import dev.ujhhgtg.reflekt.reflekt
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs.Companion.prefOption
+import dev.sun.wechat.data.KvStore.prefOption
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.TextButton

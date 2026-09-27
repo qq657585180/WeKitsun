@@ -111,7 +111,7 @@ import dev.sun.wechat.i18n.LanguageSelection
 import dev.sun.wechat.i18n.LocalWeKitLocalizedContext
 import dev.sun.wechat.i18n.SupportedLocale
 import dev.sun.wechat.i18n.WeKitLocaleController
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.m3.BaseItemContainer
 import dev.sun.wechat.ui.content.m3.BaseWidget
 import dev.sun.wechat.ui.content.m3.CornerRadius
@@ -758,7 +758,7 @@ private fun PrefSwitch(
 ) {
     // Must match the default declared on the matching `prefOption`, otherwise the switch shows
     // "off" for a preference that is actually on until the user toggles it once.
-    var checked by remember(key, default) { mutableStateOf(WePrefs.getBoolOrDef(key, default)) }
+    var checked by remember(key, default) { mutableStateOf(KvStore.getBoolOrDef(key, default)) }
     SwitchWidget(
         title = title,
         description = summary,
@@ -766,7 +766,7 @@ private fun PrefSwitch(
         checked = checked,
         onCheckedChange = {
             checked = it
-            WePrefs.putBool(key, it)
+            KvStore.putBool(key, it)
         },
     )
 }

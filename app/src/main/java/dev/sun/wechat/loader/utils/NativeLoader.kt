@@ -5,7 +5,6 @@ import android.content.Context
 import android.os.Process
 import com.tencent.mmkv.MMKV
 import dev.sun.wechat.loader.startup.StartupInfo
-import dev.sun.wechat.preferences.WePrefs
 import dev.sun.wechat.utils.fs.createDirsSafe
 import java.io.File
 import kotlin.io.path.div
@@ -46,7 +45,7 @@ object NativeLoader {
             mmkvDir.createDirsSafe()
         }
         MMKV.initialize(hostCtx, mmkvDir.toString(), libLoader)
-        MMKV.mmkvWithID(WePrefs.PREFS_NAME, MMKV.MULTI_PROCESS_MODE)
+        MMKV.mmkvWithID("wekit_prefs", MMKV.MULTI_PROCESS_MODE)
     }
 
     // Called under nativeLoadLock. Publish success only after all startup libraries load.

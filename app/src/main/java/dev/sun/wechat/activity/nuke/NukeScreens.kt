@@ -64,7 +64,7 @@ import dev.sun.wechat.features.core.featureCategoryComparator
 import dev.sun.wechat.features.items.system.SafeMode
 import dev.sun.wechat.i18n.WeKitLocaleController
 import dev.sun.wechat.i18n.LocalWeKitLocalizedContext
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.nuke.NukeCategoryIcon
 import dev.sun.wechat.ui.content.nuke.NukeCountAndChevron
 import dev.sun.wechat.ui.content.nuke.NukeDivider
@@ -568,7 +568,7 @@ fun NukeFeatureRow(
     val context = LocalWeKitLocalizedContext.current
     val revision = FeatureCategoryState.revision
     val checked = remember(feature.technicalId, revision) {
-        WePrefs.getBoolOrDef(feature.technicalId, feature.defaultEnabled)
+        KvStore.getBoolOrDef(feature.technicalId, feature.defaultEnabled)
     }
     val configurable = feature as? ClickableFeature
 

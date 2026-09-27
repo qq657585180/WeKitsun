@@ -29,7 +29,7 @@ import dev.sun.wechat.dexkit.dsl.dexMethod
 import dev.sun.wechat.features.api.core.WeApi
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.TextButton
@@ -69,7 +69,7 @@ object AutoRefresh : ClickableFeature(), IResolveDex {
     private const val MAX_INTERVAL_MINUTES = 120
     private const val REFRESH_TIMEOUT_MS = 60_000L
 
-    private var intervalMinutes by WePrefs.prefOption("moments_auto_refresh_interval_minutes", DEFAULT_INTERVAL_MINUTES)
+    private var intervalMinutes by KvStore.prefOption("moments_auto_refresh_interval_minutes", DEFAULT_INTERVAL_MINUTES)
 
     fun interface IRefreshListener {
         /** The automatic timeline request has finished processing a valid response. */

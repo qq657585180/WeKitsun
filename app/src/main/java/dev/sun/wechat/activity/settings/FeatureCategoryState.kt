@@ -8,7 +8,7 @@ import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeaturesProvider
 import dev.sun.wechat.features.core.NewFeatures
 import dev.sun.wechat.features.core.SwitchFeature
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 
 object FeatureCategoryState {
     var revision by mutableIntStateOf(0)
@@ -36,7 +36,7 @@ object FeatureCategoryState {
             .values
             .filterIsInstance<SwitchFeature>()
             .filter { feature ->
-                WePrefs.getBoolOrDef(feature.technicalId, feature.defaultEnabled) ||
+                KvStore.getBoolOrDef(feature.technicalId, feature.defaultEnabled) ||
                     (feature is ClickableFeature && feature.alwaysEnabled)
             }
             .sortedBy { it.technicalId }

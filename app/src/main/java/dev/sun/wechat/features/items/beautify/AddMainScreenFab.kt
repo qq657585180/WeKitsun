@@ -101,7 +101,7 @@ import dev.sun.wechat.features.api.ui.WeMainActivityBeautifyApi
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
 import dev.sun.wechat.i18n.LocalWeKitLocalizedContext
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.DefaultColumn
 import dev.sun.wechat.ui.content.IconButton
@@ -297,7 +297,7 @@ object AddMainScreenFab : ClickableFeature() {
     }
 
     private fun loadConfig(): List<FabItemConfig> {
-        val jsonStr = WePrefs.getString(KEY_FAB_CONFIG) ?: return defaultList
+        val jsonStr = KvStore.getString(KEY_FAB_CONFIG) ?: return defaultList
         return try {
             Json.decodeFromString<List<FabItemConfig>>(jsonStr).map(::migrateLegacyBuiltInLabel)
         } catch (e: Exception) {
@@ -339,7 +339,7 @@ object AddMainScreenFab : ClickableFeature() {
     private fun saveConfig(list: List<FabItemConfig>) {
         try {
             val jsonStr = Json.encodeToString(list)
-            WePrefs.putString(KEY_FAB_CONFIG, jsonStr)
+            KvStore.putString(KEY_FAB_CONFIG, jsonStr)
         } catch (e: Exception) {
             WeLogger.e(TAG, "保存配置失败", e)
         }
@@ -350,8 +350,8 @@ object AddMainScreenFab : ClickableFeature() {
         if (itemCount <= 0) 0.dp else 40.dp * itemCount + 12.dp * (itemCount - 1) + 16.dp
 
     private fun loadOffset() {
-        offsetXDp = WePrefs.getFloatOrDef(KEY_FAB_OFFSET_X, 0f)
-        offsetYDp = WePrefs.getFloatOrDef(KEY_FAB_OFFSET_Y, 0f)
+        offsetXDp = KvStore.getFloatOrDef(KEY_FAB_OFFSET_X, 0f)
+        offsetYDp = KvStore.getFloatOrDef(KEY_FAB_OFFSET_Y, 0f)
     }
 
     /**
@@ -383,8 +383,8 @@ object AddMainScreenFab : ClickableFeature() {
 
     private fun exitEditMode(save: Boolean, localizedContext: Context) {
         if (save) {
-            WePrefs.putFloat(KEY_FAB_OFFSET_X, offsetXDp)
-            WePrefs.putFloat(KEY_FAB_OFFSET_Y, offsetYDp)
+            KvStore.putFloat(KEY_FAB_OFFSET_X, offsetXDp)
+            KvStore.putFloat(KEY_FAB_OFFSET_Y, offsetYDp)
             showToast(localizedContext.getString(R.string.fab_position_saved))
         } else {
             offsetXDp = offsetBeforeEdit.first

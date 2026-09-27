@@ -15,7 +15,7 @@ import dev.sun.wechat.features.api.core.WeDatabaseListenerApi
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
 import dev.sun.wechat.features.items.system.localizedSystemString
-import dev.sun.wechat.preferences.WePrefs.Companion.prefOption
+import dev.sun.wechat.data.KvStore.prefOption
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.DefaultColumn

@@ -8,7 +8,7 @@ import dev.sun.wechat.agent.data.WeAgentSettings
 import dev.sun.wechat.features.api.agent.WeAgentService
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -35,7 +35,7 @@ object WeAgent : ClickableFeature() {
     override fun onEnable() {
         // Capture the legacy feature preference before it becomes irrelevant; it seeds the
         // one-time overlay-mode migration in [WeAgentSettings.overlayMode].
-        val legacyFeatureEnabled = WePrefs.getBoolOrDef(technicalId, false)
+        val legacyFeatureEnabled = KvStore.getBoolOrDef(technicalId, false)
         WeAgentService.init()
         MainScope().launch {
             val mode = withContext(Dispatchers.IO) { WeAgentSettings.overlayMode(legacyFeatureEnabled) }

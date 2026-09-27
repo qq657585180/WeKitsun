@@ -36,7 +36,7 @@ import dev.sun.wechat.features.core.SwitchFeature
 import dev.sun.wechat.features.core.featureCategoryComparator
 import dev.sun.wechat.i18n.LocalWeKitLocalizedContext
 import dev.sun.wechat.i18n.WeKitLocaleController
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.m3.BaseWidget
 import dev.sun.wechat.ui.content.m3.ExpressiveBackButton
 import dev.sun.wechat.ui.content.m3.SegmentedColumn
@@ -53,7 +53,7 @@ import java.util.Locale
 private fun featureChecked(item: BaseFeature): Boolean {
     val revision = FeatureCategoryState.revision
     return remember(item.technicalId, revision) {
-        WePrefs.getBoolOrDef(item.technicalId, (item as? SwitchFeature)?.defaultEnabled == true)
+        KvStore.getBoolOrDef(item.technicalId, (item as? SwitchFeature)?.defaultEnabled == true)
     }
 }
 

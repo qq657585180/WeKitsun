@@ -58,7 +58,7 @@ import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
 import dev.sun.wechat.features.items.beautify.CustomMessageBubbles.ICON_TINT_TAG
 import dev.sun.wechat.features.items.beautify.CustomMessageBubbles.bubbleCache
-import dev.sun.wechat.preferences.WePrefs.Companion.prefOption
+import dev.sun.wechat.data.KvStore.prefOption
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.DefaultColumn

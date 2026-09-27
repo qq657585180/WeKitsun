@@ -48,8 +48,8 @@ import dev.sun.wechat.features.items.contacts.hidecontacts.installVoipHooks
 import dev.sun.wechat.features.items.contacts.hidecontacts.rewriteMomentsFeedSql
 import dev.sun.wechat.features.items.contacts.hidecontacts.showSchedulesDialog
 import dev.sun.wechat.features.items.contacts.hidecontacts.uninstallSchedules
-import dev.sun.wechat.preferences.WePrefs
-import dev.sun.wechat.preferences.WePrefs.Companion.prefOption
+import dev.sun.wechat.data.KvStore
+import dev.sun.wechat.data.KvStore.prefOption
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.ContactsSelector
 import dev.sun.wechat.ui.content.TextButton
@@ -59,9 +59,6 @@ import dev.sun.wechat.ui.content.m3.SwitchWidget
 import dev.sun.wechat.ui.utils.showComposeDialog
 import dev.sun.wechat.utils.HostInfo
 import dev.sun.wechat.utils.WeLogger
-import dev.sun.wechat.features.api.ui.WeCurrentConversationApi
-import dev.sun.wechat.features.api.ui.WeContactPrefsScreenApi
-import dev.sun.wechat.utils.android.currentWxId
 import dev.sun.wechat.utils.android.getSystemService
 import dev.sun.wechat.utils.android.showToast
 import dev.sun.wechat.utils.now
@@ -71,11 +68,10 @@ import java.lang.ref.WeakReference
 import kotlin.math.sqrt
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
-import java.lang.reflect.Modifier as JavaModifier
 
 
 object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputBarListener,
-    WeDatabaseListenerApi.IQueryListener, WeContactPrefsScreenApi.IContactInfoProvider {
+    WeDatabaseListenerApi.IQueryListener {
 
     override val technicalId = "隐藏联系人"
     override val nameRes = R.string.feature_hide_contacts_name
@@ -92,14 +88,14 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
     private const val KEY_LEGACY_MIGRATED = "hidden_parentref_migrated"
 
     var hiddenContacts
-        get() = WePrefs.getStringSetOrDef(KEY_CONTACTS, emptySet())
+        get() = KvStore.getStringSetOrDef(KEY_CONTACTS, emptySet())
         set(value) {
             // Muting is a server-synced oplog (OpenImOpLogLogic), so only send it for contacts that
             // were just added — the previous version re-sent it for the entire set on every save.
             // NB: un-hiding deliberately does NOT restore the prior mute state; doing so would
             // overwrite a mute the user set themselves. See the design doc.
-            val newlyHidden = value - WePrefs.getStringSetOrDef(KEY_CONTACTS, emptySet())
-            WePrefs.putStringSet(KEY_CONTACTS, value)
+            val newlyHidden = value - KvStore.getStringSetOrDef(KEY_CONTACTS, emptySet())
+            KvStore.putStringSet(KEY_CONTACTS, value)
             for (convId in newlyHidden) {
                 WeConversationApi.setDnd(convId, true)
             }
@@ -203,9 +199,6 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
     }
 
     override fun onEnable() {
-        // 资料页「加入/移出名单」入口(InkHide 移植)
-        WeContactPrefsScreenApi.addProvider(this)
-
         // --- home screen conversation list ---
 
         // Hide at query time: inject `username NOT IN (...)` into WeChat's list queries so hidden
@@ -246,23 +239,6 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
                     clickCount = 0
                     toggleTemporarilyShown(context)
                 }
-            }
-            // 长按标题同样切换显隐(InkHide quickDisplayLongPress 同款交互)
-            titleView.setOnLongClickListener {
-                if (!tripleClickTitle) return@setOnLongClickListener false
-                toggleTemporarilyShown(context)
-                true
-            }
-        }
-
-        // 微信退到后台即恢复隐藏(InkHide 行为): 想再次查看需重新三击/长按标题
-        LauncherUI::class.reflekt().firstMethod {
-            name = "onStop"
-            superclass()
-        }.hookAfter {
-            if (temporarilyShown) {
-                temporarilyShown = false
-                WeConversationApi.reloadConversations()
             }
         }
 
@@ -333,7 +309,7 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
         // CoreService, which the host manifest pins to :push — a process this feature never loads
         // in — so a dealNotify hook registered from here would never fire where it matters. Both
         // notification hooks now live in HideContactsNotifications, which loads in main + push and
-        // reads this feature's persisted state out of WePrefs.
+        // reads this feature's persisted state out of KvStore.
 
         // --- 定时显示/隐藏 ---
         //
@@ -347,7 +323,6 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
     }
 
     override fun onDisable() {
-        WeContactPrefsScreenApi.removeProvider(this)
         uninstallSchedules()
         unregisterScreenOffReceiver()
         ShakeDetector.stop()
@@ -369,10 +344,7 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
             showToast(context, context.localizedContactsString(R.string.contacts_hide_restored))
         } else {
             temporarilyShown = true
-            showToast(
-                context,
-                showTipText.ifBlank { context.localizedContactsString(R.string.contacts_hide_temporarily_shown) },
-            )
+            showToast(context, context.localizedContactsString(R.string.contacts_hide_temporarily_shown))
         }
         WeConversationApi.reloadConversations()
     }
@@ -408,7 +380,7 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
                 temporarilyShown = true
                 showToast(
                     chatFooter.context,
-                    showTipText.ifBlank { chatFooter.context.localizedContactsString(R.string.contacts_hide_shown_command_hint) },
+                    chatFooter.context.localizedContactsString(R.string.contacts_hide_shown_command_hint),
                 )
                 WeConversationApi.reloadConversations()
             }
@@ -429,78 +401,7 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
                 )
                 WeConversationApi.reloadConversations()
             }
-
-            "#add" -> {
-                // 把当前会话对象加入隐藏名单(InkHide 移植)
-                chatFooter.lastText = ""
-                val talker = WeCurrentConversationApi.value
-                when {
-                    talker.isNullOrBlank() ->
-                        showToast(chatFooter.context, chatFooter.context.localizedContactsString(R.string.contacts_hide_no_conversation))
-                    talker in hiddenContacts ->
-                        showToast(chatFooter.context, chatFooter.context.localizedContactsString(R.string.contacts_hide_already_in_list))
-                    else -> {
-                        hiddenContacts = hiddenContacts + talker
-                        WeConversationApi.reloadConversations()
-                        showToast(chatFooter.context, chatFooter.context.localizedContactsString(R.string.contacts_hide_added_toast, talker))
-                    }
-                }
-            }
-
-            "#del" -> {
-                // 把当前会话对象移出隐藏名单(InkHide 移植)
-                chatFooter.lastText = ""
-                val talker = WeCurrentConversationApi.value
-                when {
-                    talker.isNullOrBlank() ->
-                        showToast(chatFooter.context, chatFooter.context.localizedContactsString(R.string.contacts_hide_no_conversation))
-                    talker !in hiddenContacts ->
-                        showToast(chatFooter.context, chatFooter.context.localizedContactsString(R.string.contacts_hide_not_in_list))
-                    else -> {
-                        hiddenContacts = hiddenContacts - talker
-                        WeConversationApi.reloadConversations()
-                        showToast(chatFooter.context, chatFooter.context.localizedContactsString(R.string.contacts_hide_removed_toast, talker))
-                    }
-                }
-            }
         }
-    }
-
-    // ---------------- 资料页「加入/移出名单」(InkHide 移植) ----------------
-
-    private const val PREF_KEY_TOGGLE = "hide_contacts_toggle"
-
-    override fun getContactInfoItem(activity: Activity): List<WeContactPrefsScreenApi.PreferenceItem> {
-        val wxid = activity.currentWxId ?: return emptyList()
-        if (wxid.isBlank()) return emptyList()
-        val inList = wxid in hiddenContacts
-        return listOf(
-            WeContactPrefsScreenApi.PreferenceItem(
-                key = PREF_KEY_TOGGLE,
-                title = activity.localizedContactsString(
-                    if (inList) R.string.contacts_hide_remove_from_list else R.string.contacts_hide_add_to_list,
-                ),
-                summary = activity.localizedContactsString(
-                    if (inList) R.string.contacts_hide_in_list_summary else R.string.contacts_hide_add_list_summary,
-                ),
-                position = 1,
-            ),
-        )
-    }
-
-    override fun onItemClick(activity: Activity, key: String): Boolean {
-        if (key != PREF_KEY_TOGGLE) return false
-        val wxid = activity.currentWxId ?: return true
-        if (wxid.isBlank()) return true
-        if (wxid in hiddenContacts) {
-            hiddenContacts = hiddenContacts - wxid
-            showToast(activity, activity.localizedContactsString(R.string.contacts_hide_removed_toast, wxid))
-        } else {
-            hiddenContacts = hiddenContacts + wxid
-            showToast(activity, activity.localizedContactsString(R.string.contacts_hide_added_toast, wxid))
-        }
-        WeConversationApi.reloadConversations()
-        return true
     }
 
     override fun onQuery(sql: String): String? = rewriteMomentsFeedSql(sql)
@@ -515,11 +416,11 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
     // it from our set and never touched parentRef. Scoped to our hidden set so we don't disturb rows
     // hidden by 显隐全部对话 (ToggleAllConversationsVisibility), which shares the same marker.
     private fun migrateLegacyHiddenParentRef() {
-        if (WePrefs.getBoolOrFalse(KEY_LEGACY_MIGRATED)) return
+        if (KvStore.getBoolOrFalse(KEY_LEGACY_MIGRATED)) return
 
         val hidden = hiddenContacts
         if (hidden.isEmpty()) {
-            WePrefs.putBool(KEY_LEGACY_MIGRATED, true)
+            KvStore.putBool(KEY_LEGACY_MIGRATED, true)
             return
         }
 
@@ -533,7 +434,7 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
                         "WHERE parentRef = '$LEGACY_HIDDEN_PARENT_REF' " +
                         "AND username IN ($inClause)"
             )
-            WePrefs.putBool(KEY_LEGACY_MIGRATED, true)
+            KvStore.putBool(KEY_LEGACY_MIGRATED, true)
             WeLogger.d(TAG, "cleared legacy hidden parentRef markers for ${hidden.size} chats")
         } catch (ex: Exception) {
             WeLogger.w(TAG, "failed to clear legacy hidden parentRef markers", ex)
@@ -555,9 +456,6 @@ object HideContacts : ClickableFeature(), IResolveDex, WeChatInputBarApi.IInputB
 
     private var autoRejectVoip by prefOption("hide_auto_reject", false)
     private var tripleClickTitle by prefOption("hide_triple_click_title", false)
-
-    /** 临时显示后的提示文案(InkHide 提示自定义), 默认撩妹开始 */
-    private var showTipText by prefOption("hide_show_tip_text", "撩妹开始")
 
     // Three taps within this window on the main-screen title register as a triple-click.
     // Matches WeChat's own double-tap detection threshold (f8/r8 tab listener, 300 ms),

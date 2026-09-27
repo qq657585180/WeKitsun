@@ -83,7 +83,7 @@ import dev.sun.wechat.features.api.core.models.WeGroup
 import dev.sun.wechat.features.api.core.models.WeOfficialAccount
 import dev.sun.wechat.features.items.chat.ConversationAggregation
 import dev.sun.wechat.features.items.chat.ConversationGrouping
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.utils.WeLogger
 import dev.sun.wechat.utils.android.showToast
 import kotlinx.coroutines.Dispatchers
@@ -112,7 +112,7 @@ private enum class ContactFilterMode(val icon: ImageVector, @StringRes val nameR
     GROUPING(MaterialSymbols.Outlined.Groups, R.string.contact_filter_mode_grouping),
 }
 
-private var persistedContactFilterMode by WePrefs.prefOption(
+private var persistedContactFilterMode by KvStore.prefOption(
     "contact_selector_filter_mode",
     ContactFilterMode.LABELS.name,
 )

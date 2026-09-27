@@ -13,7 +13,7 @@ import dev.sun.wechat.dexkit.abc.IResolveDex
 import dev.sun.wechat.dexkit.dsl.dexMethod
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.TextButton
@@ -48,7 +48,7 @@ object FakeVoiceDuration : ClickableFeature(), IResolveDex {
 
     /** 供 TTS 等发送路径复用：返回伪装毫秒数；0 表示不伪装。 */
     fun fakeDurationMs(): Long {
-        val seconds = WePrefs.getLongOrDef(KEY_DURATION, 0L)
+        val seconds = KvStore.getLongOrDef(KEY_DURATION, 0L)
         return if (seconds > 0L) seconds.coerceIn(MIN_SECONDS, MAX_SECONDS) * 1000L else 0L
     }
 
@@ -64,7 +64,7 @@ object FakeVoiceDuration : ClickableFeature(), IResolveDex {
 
     override fun onClick(context: ComponentActivity) {
         showComposeDialog(context) {
-            var secondsInput by remember { mutableStateOf(WePrefs.getLongOrDef(KEY_DURATION, 0L).toString()) }
+            var secondsInput by remember { mutableStateOf(KvStore.getLongOrDef(KEY_DURATION, 0L).toString()) }
             AlertDialogContent(
                 title = { Text(stringResource(R.string.feature_fake_voice_duration_name)) },
                 text = {
@@ -89,7 +89,7 @@ object FakeVoiceDuration : ClickableFeature(), IResolveDex {
                             showToast(localizedChatString(R.string.chat_fake_voice_duration_invalid))
                             return@Button
                         }
-                        WePrefs.putLong(KEY_DURATION, seconds)
+                        KvStore.putLong(KEY_DURATION, seconds)
                         onDismiss()
                     }) { Text(stringResource(R.string.dialog_confirm)) }
                 },

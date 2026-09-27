@@ -1,6 +1,6 @@
 package dev.sun.wechat.features.items.chat.panel
 
-import dev.sun.wechat.preferences.WePrefs.Companion.prefOption
+import dev.sun.wechat.data.KvStore.prefOption
 
 object PanelSettings {
     const val DEFAULT_FUNBOX_API_CLIENT_WXID = "wxid_1234567890abcd"

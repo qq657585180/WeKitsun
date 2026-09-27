@@ -3,12 +3,12 @@ package dev.sun.wechat.features.api.agent
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import dev.sun.wechat.agent.data.WeAgentDatabase
 import dev.sun.wechat.agent.data.WeAgentRepository
 import dev.sun.wechat.agent.data.WeAgentSettings
 import dev.sun.wechat.agent.data.entity.ApprovalStatus
 import dev.sun.wechat.agent.data.entity.MessageRole
 import dev.sun.wechat.agent.data.entity.ModelProviderType
+import dev.sun.wechat.data.WeKitDatabase
 import dev.sun.wechat.agent.engine.AgentEvent
 import dev.sun.wechat.agent.engine.AgentSessionContext
 import dev.sun.wechat.agent.engine.AgentSessionEngine
@@ -263,7 +263,7 @@ object WeAgentService : TriggerManager.TriggerHost {
 
     private suspend fun initialize() {
         // Warm the DB, load settings.
-        WeAgentDatabase.instance
+        WeKitDatabase.instance
         LocalLlamaSync.schedule()
         linuxEnvironmentManager.initialize()
         WeAgentSettings.load()

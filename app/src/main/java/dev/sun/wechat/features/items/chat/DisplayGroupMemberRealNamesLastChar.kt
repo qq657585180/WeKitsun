@@ -23,7 +23,7 @@ import dev.sun.wechat.features.api.ui.WeContactPrefsScreenApi.PreferenceItem
 import dev.sun.wechat.features.api.ui.WeCurrentConversationApi
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.DefaultColumn
@@ -62,7 +62,7 @@ object DisplayGroupMemberRealNamesLastChar : ClickableFeature(), IContactInfoPro
      * Foreground color for the real-name annotation. Exposed so
      * [DisplayGroupMemberRealName] (the sole TextView annotator) can read the same preference.
      */
-    var annotationFg by WePrefs.prefOption("real_name_last_char_fg", DEFAULT_FG)
+    var annotationFg by KvStore.prefOption("real_name_last_char_fg", DEFAULT_FG)
 
     override fun onClick(context: ComponentActivity) {
         showComposeDialog(context) {
@@ -90,7 +90,7 @@ object DisplayGroupMemberRealNamesLastChar : ClickableFeature(), IContactInfoPro
 
     private const val PREF_KEY = "real_name_last_char"
 
-    private val cacheFile by lazy { KnownPaths.moduleData / "real_names.json" }
+    private val cacheFile by lazy { KnownPaths.moduleRoot / "real_names.json" }
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
     /**

@@ -22,7 +22,7 @@ import dev.sun.wechat.features.api.core.models.MessageInfo
 import dev.sun.wechat.features.core.ApiFeature
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.ContactsSelector
 import dev.sun.wechat.ui.content.TextButton
@@ -42,9 +42,9 @@ object BlockAtAllNotifications : ClickableFeature() {
     override val categoryIds = listOf(FeatureCategoryIds.CHAT)
     override val descriptionRes = R.string.feature_block_at_all_notifications_description
 
-    private var useWhitelist by WePrefs.prefOption(KEY_USE_WHITELIST, false)
-    private var whitelist by WePrefs.prefOption(KEY_WHITELIST, emptySet())
-    private var blacklist by WePrefs.prefOption(KEY_BLACKLIST, emptySet())
+    private var useWhitelist by KvStore.prefOption(KEY_USE_WHITELIST, false)
+    private var whitelist by KvStore.prefOption(KEY_WHITELIST, emptySet())
+    private var blacklist by KvStore.prefOption(KEY_BLACKLIST, emptySet())
 
     override fun onClick(context: ComponentActivity) {
         showComposeDialog(context) {
@@ -128,11 +128,11 @@ object BlockAtAllNotifications : ClickableFeature() {
     }
 
     fun shouldSuppress(groupId: String): Boolean {
-        if (!groupId.isGroupChatWxId || !WePrefs.getBoolOrDef(technicalId, false)) return false
-        return if (WePrefs.getBoolOrDef(KEY_USE_WHITELIST, false)) {
-            groupId !in WePrefs.getStringSetOrDef(KEY_WHITELIST, emptySet())
+        if (!groupId.isGroupChatWxId || !KvStore.getBoolOrDef(technicalId, false)) return false
+        return if (KvStore.getBoolOrDef(KEY_USE_WHITELIST, false)) {
+            groupId !in KvStore.getStringSetOrDef(KEY_WHITELIST, emptySet())
         } else {
-            groupId in WePrefs.getStringSetOrDef(KEY_BLACKLIST, emptySet())
+            groupId in KvStore.getStringSetOrDef(KEY_BLACKLIST, emptySet())
         }
     }
 

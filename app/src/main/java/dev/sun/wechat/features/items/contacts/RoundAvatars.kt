@@ -15,7 +15,7 @@ import dev.sun.wechat.dexkit.dsl.dexConstructor
 import dev.sun.wechat.dexkit.dsl.dexMethod
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.TextButton
 import dev.sun.wechat.ui.content.m3.BaseItemContainer
@@ -43,7 +43,7 @@ object RoundAvatars : ClickableFeature(), IResolveDex {
     private val methodAvatarModify by dexMethod()
 
     private val radiusFactor: Float
-        get() = WePrefs.getFloatOrDef(KEY_ROUND_AVATAR, 0.5f).coerceIn(0.1f, 0.5f)
+        get() = KvStore.getFloatOrDef(KEY_ROUND_AVATAR, 0.5f).coerceIn(0.1f, 0.5f)
 
     override fun onEnable() {
         CustomLocalFriendAvatars.methodConversationAvatar.hookBefore {
@@ -104,7 +104,7 @@ object RoundAvatars : ClickableFeature(), IResolveDex {
                                     valueSuffix = "%",
                                     onValueChange = {
                                         percent = it
-                                        WePrefs.putFloat(KEY_ROUND_AVATAR, it / 100f)
+                                        KvStore.putFloat(KEY_ROUND_AVATAR, it / 100f)
                                         notifyCustomContactAvatarChanged()
                                     },
                                 )

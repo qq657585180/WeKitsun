@@ -24,8 +24,8 @@ import dev.sun.wechat.features.api.ui.WeChatMessageViewApi
 import dev.sun.wechat.features.api.ui.WeCurrentConversationApi
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
-import dev.sun.wechat.preferences.WePrefs.Companion.prefOption
+import dev.sun.wechat.data.KvStore
+import dev.sun.wechat.data.KvStore.prefOption
 import dev.sun.wechat.utils.HookParam
 import dev.sun.wechat.utils.WeLogger
 import dev.sun.wechat.utils.android.showToast
@@ -382,46 +382,46 @@ object ReadReceipts : ClickableFeature(),
     }
 
     private fun migrateLegacyConfiguration(): ReadReceiptsConfiguration {
-        val mode = WePrefs.getStringOrDef(
+        val mode = KvStore.getStringOrDef(
             "read_receipts_backend_mode",
             ReadReceiptsServerMode.THIRD_PARTY.name,
         ).let { name ->
             ReadReceiptsServerMode.entries.firstOrNull { it.name == name }
                 ?: ReadReceiptsServerMode.THIRD_PARTY
         }
-        val legacyPort = WePrefs.getIntOrDef("read_receipts_built_in_port", 0)
-        val automaticPort = WePrefs.getBoolOrDef(
+        val legacyPort = KvStore.getIntOrDef("read_receipts_built_in_port", 0)
+        val automaticPort = KvStore.getBoolOrDef(
             "read_receipts_automatic_port",
             true,
         )
         return ReadReceiptsConfiguration(
             mode = mode,
-            thirdPartyUrl = WePrefs.getStringOrDef("read_receipts_third_party_url", ""),
-            pollIntervalSecs = WePrefs.getIntOrDef("read_receipts_poll_interval", 5)
+            thirdPartyUrl = KvStore.getStringOrDef("read_receipts_third_party_url", ""),
+            pollIntervalSecs = KvStore.getIntOrDef("read_receipts_poll_interval", 5)
                 .takeIf { it > 0 } ?: 5,
             automaticPort = automaticPort,
             builtInPort = legacyPort.takeIf { it in 1..65535 } ?: 3000,
-            automaticLifecycle = WePrefs.getBoolOrDef(
+            automaticLifecycle = KvStore.getBoolOrDef(
                 "read_receipts_automatic_lifecycle",
                 true,
             ),
-            tunnelMode = WePrefs.getStringOrDef("read_receipts_tunnel_mode", "QUICK")
+            tunnelMode = KvStore.getStringOrDef("read_receipts_tunnel_mode", "QUICK")
                 .takeIf(String::isNotBlank)
                 ?: "QUICK",
-            hostname = WePrefs.getStringOrDef("read_receipts_hostname", ""),
-            selectedAccountId = WePrefs.getStringOrDef(
+            hostname = KvStore.getStringOrDef("read_receipts_hostname", ""),
+            selectedAccountId = KvStore.getStringOrDef(
                 "read_receipts_selected_account_id",
                 "",
             ),
-            selectedAccountName = WePrefs.getStringOrDef(
+            selectedAccountName = KvStore.getStringOrDef(
                 "read_receipts_selected_account_name",
                 "",
             ),
-            selectedTunnelId = WePrefs.getStringOrDef(
+            selectedTunnelId = KvStore.getStringOrDef(
                 "read_receipts_selected_tunnel_id",
                 "",
             ),
-            selectedTunnelName = WePrefs.getStringOrDef(
+            selectedTunnelName = KvStore.getStringOrDef(
                 "read_receipts_selected_tunnel_name",
                 "",
             ),

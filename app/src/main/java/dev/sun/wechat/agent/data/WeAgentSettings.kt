@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 object WeAgentSettings {
 
-    private val db get() = WeAgentDatabase.instance
+    private val db get() = WeKitDatabase.instance
     private val cache = ConcurrentHashMap<String, String>()
 
     // Keys

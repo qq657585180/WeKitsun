@@ -39,7 +39,7 @@ import dev.sun.wechat.features.api.core.WeMessageApi
 import dev.sun.wechat.features.api.core.models.MessageType
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.ContactsSelector
@@ -91,20 +91,20 @@ object AiChat : ClickableFeature(), WeDatabaseListenerApi.IInsertListener {
     private const val LIST_BLACKLIST = 1
 
     // ---- 配置（键名与 Nuke 的 AIChatConfig 字段一一对应） ----
-    var systemPrompt by WePrefs.prefOption("ai_chat_system_prompt", "")
-    var temperature by WePrefs.prefOption("ai_chat_temperature", 0.7f)
-    var maxTokens by WePrefs.prefOption("ai_chat_max_tokens", 512)
-    var contextRounds by WePrefs.prefOption("ai_chat_context_rounds", 6)
-    var replyDelayMs by WePrefs.prefOption("ai_chat_reply_delay_ms", 0L)
-    var listMode by WePrefs.prefOption("ai_chat_list_mode", LIST_WHITELIST)
+    var systemPrompt by KvStore.prefOption("ai_chat_system_prompt", "")
+    var temperature by KvStore.prefOption("ai_chat_temperature", 0.7f)
+    var maxTokens by KvStore.prefOption("ai_chat_max_tokens", 512)
+    var contextRounds by KvStore.prefOption("ai_chat_context_rounds", 6)
+    var replyDelayMs by KvStore.prefOption("ai_chat_reply_delay_ms", 0L)
+    var listMode by KvStore.prefOption("ai_chat_list_mode", LIST_WHITELIST)
 
     private var whitelist: Set<String>
-        get() = WePrefs.getStringSetOrDef("ai_chat_whitelist", emptySet())
-        set(value) = WePrefs.putStringSet("ai_chat_whitelist", value)
+        get() = KvStore.getStringSetOrDef("ai_chat_whitelist", emptySet())
+        set(value) = KvStore.putStringSet("ai_chat_whitelist", value)
 
     private var blacklist: Set<String>
-        get() = WePrefs.getStringSetOrDef("ai_chat_blacklist", emptySet())
-        set(value) = WePrefs.putStringSet("ai_chat_blacklist", value)
+        get() = KvStore.getStringSetOrDef("ai_chat_blacklist", emptySet())
+        set(value) = KvStore.putStringSet("ai_chat_blacklist", value)
 
     /** 配置快照；用于「生成期间配置变了就丢弃」的判定（Nuke 用 AIChatConfig.equals）。 */
     private data class Config(

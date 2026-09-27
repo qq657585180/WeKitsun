@@ -8,7 +8,7 @@ import dev.sun.wechat.features.api.core.WeApi
 import dev.sun.wechat.features.api.core.WeDatabaseListenerApi
 import dev.sun.wechat.features.api.ui.WeMomentsApi
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.utils.WeLogger
 import kotlinx.coroutines.runBlocking
 import java.util.concurrent.ConcurrentHashMap
@@ -37,7 +37,7 @@ object AutoRepostMoments : AutoMomentsBase(),
     @Volatile
     private var lastActionSentAt = 0L
 
-    private var forwardedSnsIds by WePrefs.prefOption(
+    private var forwardedSnsIds by KvStore.prefOption(
         "moments_auto_forward_forwarded_ids",
         emptySet()
     )

@@ -16,8 +16,8 @@ import dev.ujhhgtg.reflekt.utils.Modifiers
 import dev.sun.wechat.R
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
-import dev.sun.wechat.preferences.WePrefs.Companion.getBoolOrFalse
+import dev.sun.wechat.data.KvStore
+import dev.sun.wechat.data.KvStore.getBoolOrFalse
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.TextButton
 import dev.sun.wechat.ui.content.m3.SegmentedColumn
@@ -140,7 +140,7 @@ object RedirectHostLogs : ClickableFeature() {
                                 checked = v,
                                 onCheckedChange = {
                                     v = it
-                                    WePrefs.putBool("${KEY_PREFIX}v", it)
+                                    KvStore.putBool("${KEY_PREFIX}v", it)
                                     dirty = true
                                 },
                             )
@@ -152,7 +152,7 @@ object RedirectHostLogs : ClickableFeature() {
                                 checked = d,
                                 onCheckedChange = {
                                     d = it
-                                    WePrefs.putBool("${KEY_PREFIX}d", it)
+                                    KvStore.putBool("${KEY_PREFIX}d", it)
                                     dirty = true
                                 },
                             )
@@ -164,7 +164,7 @@ object RedirectHostLogs : ClickableFeature() {
                                 checked = i,
                                 onCheckedChange = {
                                     i = it
-                                    WePrefs.putBool("${KEY_PREFIX}i", it)
+                                    KvStore.putBool("${KEY_PREFIX}i", it)
                                     dirty = true
                                 },
                             )
@@ -176,7 +176,7 @@ object RedirectHostLogs : ClickableFeature() {
                                 checked = w,
                                 onCheckedChange = {
                                     w = it
-                                    WePrefs.putBool("${KEY_PREFIX}w", it)
+                                    KvStore.putBool("${KEY_PREFIX}w", it)
                                     dirty = true
                                 },
                             )
@@ -188,7 +188,7 @@ object RedirectHostLogs : ClickableFeature() {
                                 checked = e,
                                 onCheckedChange = {
                                     e = it
-                                    WePrefs.putBool("${KEY_PREFIX}e", it)
+                                    KvStore.putBool("${KEY_PREFIX}e", it)
                                     dirty = true
                                 },
                             )

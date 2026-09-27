@@ -6,7 +6,7 @@ import kotlin.io.path.moveTo
 import dev.sun.wechat.constants.Preferences
 import dev.sun.wechat.dexkit.abc.IResolveDex
 import dev.sun.wechat.features.core.BaseFeature
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.utils.WeLogger
 import dev.sun.wechat.utils.fs.KnownPaths
 import dev.sun.wechat.utils.fs.createDirsSafe
@@ -37,11 +37,11 @@ object DexCacheManager {
     private const val KEY_HOST_VERSION = "host_version"
 
     private val cacheDir: Path by lazy {
-        (KnownPaths.moduleData / CACHE_DIR_NAME).createDirsSafe()
+        (KnownPaths.moduleRoot / CACHE_DIR_NAME).createDirsSafe()
     }
 
     fun init(currentVer: String) {
-        val cachedVer = WePrefs.getString(KEY_HOST_VERSION)
+        val cachedVer = KvStore.getString(KEY_HOST_VERSION)
         if (cachedVer != currentVer) {
             WeLogger.i(TAG, "host version changed: $cachedVer -> $currentVer, resetting all cache")
             clearAllCache()
@@ -49,7 +49,7 @@ object DexCacheManager {
             WeLogger.i(TAG, "disabling NO_DEX_RESOLVE due to host version change")
         }
 
-        WePrefs.putString(KEY_HOST_VERSION, currentVer)
+        KvStore.putString(KEY_HOST_VERSION, currentVer)
     }
 
     /**

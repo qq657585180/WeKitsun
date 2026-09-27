@@ -1,7 +1,7 @@
 package dev.sun.wechat.features.core
 
 import android.content.Context
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.utils.WeLogger
 
 abstract class SwitchFeature : BaseFeature() {
@@ -22,7 +22,7 @@ abstract class SwitchFeature : BaseFeature() {
         get() = _isEnabled
 
     fun loadPersistedState() {
-        _isEnabled = WePrefs.getBoolOrDef(technicalId, defaultEnabled)
+        _isEnabled = KvStore.getBoolOrDef(technicalId, defaultEnabled)
     }
 
     final override fun startup() {
@@ -56,7 +56,7 @@ abstract class SwitchFeature : BaseFeature() {
     }
 
     fun applyToggle(newState: Boolean) {
-        WePrefs.putBool(technicalId, newState)
+        KvStore.putBool(technicalId, newState)
         isEnabled = newState
         toggleCompletionCallback?.run()
     }

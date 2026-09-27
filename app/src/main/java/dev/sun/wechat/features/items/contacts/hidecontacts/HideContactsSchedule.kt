@@ -10,7 +10,7 @@ import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import dev.sun.wechat.features.items.contacts.HideContacts
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.utils.HostInfo
 import dev.sun.wechat.utils.TargetProcesses
 import dev.sun.wechat.utils.WeLogger
@@ -117,7 +117,7 @@ object HideContactsSchedule {
      */
     private const val URI_SCHEME = "wekit"
 
-    private var raw by WePrefs.prefOption(KEY_SCHEDULES, "")
+    private var raw by KvStore.prefOption(KEY_SCHEDULES, "")
 
     /** Whether [install] has run in this process. Guards [resync] against arming a disabled feature. */
     private var installed = false
@@ -134,7 +134,7 @@ object HideContactsSchedule {
     // ── persistence ──────────────────────────────────────────────────────────────────────────────
 
     /**
-     * The schedule list, sanitized. Reads parse from [WePrefs] every time (the list is tiny and only
+     * The schedule list, sanitized. Reads parse from [KvStore] every time (the list is tiny and only
      * touched on alarm fire / edit), so a write from the settings UI is visible to the receiver
      * immediately.
      *

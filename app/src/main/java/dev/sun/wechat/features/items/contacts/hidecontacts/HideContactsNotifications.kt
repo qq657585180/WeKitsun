@@ -7,7 +7,7 @@ import dev.sun.wechat.features.core.ApiFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
 import dev.sun.wechat.features.items.contacts.HideContacts
 import dev.sun.wechat.features.items.notifications.NotificationsEvolved
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.utils.TargetProcess
 import dev.sun.wechat.utils.WeLogger
 
@@ -119,16 +119,16 @@ object HideContactsNotifications : ApiFeature(), IResolveDex {
     /**
      * Whether a notification for [wxId] must be swallowed.
      *
-     * Everything is read from [WePrefs] (MMKV in `MULTI_PROCESS_MODE`) rather than from
+     * Everything is read from [KvStore] (MMKV in `MULTI_PROCESS_MODE`) rather than from
      * [HideContacts]'s runtime state, because none of that state exists in `:push`:
      * - `SwitchFeature` persists its on/off state under the feature's `technicalId`, so the 隐藏联系人 switch
      *   is readable here;
-     * - `HideContacts.hiddenContacts` is itself nothing but a [WePrefs] string-set read.
+     * - `HideContacts.hiddenContacts` is itself nothing but a [KvStore] string-set read.
      *
      * `HideContacts.temporarilyShown` is intentionally *not* consulted — see the class KDoc.
      */
     private fun isSuppressed(wxId: String): Boolean =
-        WePrefs.getBoolOrDef(HideContacts.technicalId, false) && wxId in HideContacts.hiddenContacts
+        KvStore.getBoolOrDef(HideContacts.technicalId, false) && wxId in HideContacts.hiddenContacts
 
     override fun onEnable() {
         // Both bodies only cancel the call; they mutate no WeChat state and so cannot re-trigger the

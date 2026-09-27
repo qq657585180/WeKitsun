@@ -33,7 +33,7 @@ import dev.sun.wechat.features.api.net.models.protobuf.BeforeTransferReqProto
 import dev.sun.wechat.features.api.net.models.protobuf.BeforeTransferRespProto
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.DefaultColumn
@@ -97,11 +97,11 @@ object DetectDeletedFriends : ClickableFeature() {
         data object RateLimited : DetectionOutcome
     }
 
-    private var detectionModeName by WePrefs.prefOption(
+    private var detectionModeName by KvStore.prefOption(
         "detect_deleted_friends_mode",
         DetectionMode.BEFORE_TRANSFER.name,
     )
-    private var requestDelaySeconds by WePrefs.prefOption(
+    private var requestDelaySeconds by KvStore.prefOption(
         "detect_deleted_friends_delay_seconds",
         "2",
     )

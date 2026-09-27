@@ -24,7 +24,11 @@ import dev.sun.wechat.R
 import dev.sun.wechat.i18n.LocalWeKitLocalizedContext
 import dev.sun.wechat.features.api.core.WeDatabaseApi
 import dev.sun.wechat.features.api.core.models.IWeContact
-import dev.sun.wechat.features.items.AtomicJsonConfigStore
+import dev.sun.wechat.data.JsonDataMigration
+import dev.sun.wechat.data.WeKitDatabase
+import dev.sun.wechat.data.structured.asOverrides
+import dev.sun.wechat.features.items.AutomationSaveContent
+import dev.sun.wechat.features.items.rememberAutomationSaveState
 import dev.sun.wechat.features.items.AutomationContactSettingsSelector
 import dev.sun.wechat.features.items.AutomationKeywordMode
 import dev.sun.wechat.features.items.AutomationKeywordRule
@@ -32,7 +36,7 @@ import dev.sun.wechat.features.items.AutomationTimeRangeRule
 import dev.sun.wechat.features.items.AutomationToggleRule
 import dev.sun.wechat.features.items.automationKeywordSummary
 import dev.sun.wechat.features.items.formatAutomationMinute
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.TextButton
@@ -40,12 +44,13 @@ import dev.sun.wechat.ui.content.m3.SegmentedColumn
 import dev.sun.wechat.ui.utils.showComposeDialog
 import dev.sun.wechat.utils.WeLogger
 import dev.sun.wechat.utils.android.showToast
-import dev.sun.wechat.utils.fs.KnownPaths
 import dev.sun.wechat.utils.strings.isGroupChatWxId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import java.math.BigDecimal
 import java.math.RoundingMode
-import kotlin.io.path.div
 import kotlin.random.Random
 
 object TransferSettings {
@@ -101,7 +106,6 @@ object TransferSettings {
         val memoKeyword: AutomationKeywordRule = AutomationKeywordRule(),
         val delay: DelayRule = DelayRule(),
         val notification: AutomationToggleRule = AutomationToggleRule(),
-        val sendRecordToSelf: AutomationToggleRule = AutomationToggleRule(),
         val autoReply: ReplyRule = ReplyRule()
     ) {
         fun accepts(totalFeeCents: Long, payMemo: String): Boolean =
@@ -119,7 +123,6 @@ object TransferSettings {
         val memoKeyword: AutomationKeywordRule? = null,
         val delay: DelayRule? = null,
         val notification: AutomationToggleRule? = null,
-        val sendRecordToSelf: AutomationToggleRule? = null,
         val autoReply: ReplyRule? = null
     ) {
         fun overriddenCount(): Int = listOf(
@@ -129,7 +132,6 @@ object TransferSettings {
             memoKeyword,
             delay,
             notification,
-            sendRecordToSelf,
             autoReply
         ).count { it != null }
 
@@ -137,7 +139,7 @@ object TransferSettings {
     }
 
     @Serializable
-    private data class StoredConfig(
+    data class StoredConfig(
         val version: Int = CONFIG_VERSION,
         val global: RuleSet = RuleSet(),
         val contacts: Map<String, RuleOverrides> = emptyMap(),
@@ -151,21 +153,16 @@ object TransferSettings {
         MEMO_KEYWORD,
         DELAY,
         NOTIFICATION,
-        SEND_RECORD_TO_SELF,
         AUTO_REPLY
     }
 
-    private val store by lazy {
-        AtomicJsonConfigStore(
-            file = KnownPaths.moduleData / "auto_accept_transfer_settings.json",
-            serializer = StoredConfig.serializer(),
-            tag = TAG,
-            initialValue = ::migrateLegacyConfig
-        )
-    }
+    @Volatile
+    private var cachedConfig: StoredConfig? = null
+
+    fun requireReady() { loadConfig() }
 
     fun resolve(talker: String, payer: String): RuleSet {
-        val config = store.get()
+        val config = loadConfig()
         var rules = config.global.apply(config.contacts[talker])
         if (talker.isGroupChatWxId && payer.isNotBlank()) {
             rules = rules.apply(config.groupMembers[talker]?.get(payer))
@@ -174,6 +171,10 @@ object TransferSettings {
     }
 
     fun showMainDialog(context: Context) {
+        if (!JsonDataMigration.isCompleted("json", "TransferSettings")) {
+            showToast(context, context.localizedPaymentString(R.string.structured_storage_unavailable))
+            return
+        }
         showComposeDialog(context) {
             AlertDialogContent(
                 title = { Text(stringResource(R.string.feature_auto_accept_transfers_name)) },
@@ -203,7 +204,9 @@ object TransferSettings {
     private fun showGlobalDialog(context: Context) {
         showComposeDialog(context) {
             val localizedContext by rememberUpdatedState(LocalWeKitLocalizedContext.current)
-            var draft by remember { mutableStateOf(store.get().global) }
+            val saveState = rememberAutomationSaveState()
+            androidx.compose.runtime.SideEffect { dialog.setCancelable(!saveState.saving) }
+            var draft by remember { mutableStateOf(loadConfig().global) }
             var editText by remember { mutableStateOf<PaymentTextEditMode?>(null) }
             val validationError = validate(localizedContext, draft)
 
@@ -219,28 +222,31 @@ object TransferSettings {
                     .fillMaxHeight(),
                 title = { Text(stringResource(R.string.automation_global_settings)) },
                 text = {
-                    RuleSetEditor(
-                        rules = draft,
-                        overriddenKeys = null,
-                        parentLabel = "",
-                        validationError = validationError,
-                        onActivate = {},
-                        onReset = {},
-                        onChange = { _, updated -> draft = updated },
-                        onEditText = { editText = it },
-                    )
+                    AutomationSaveContent(saveState) {
+                        RuleSetEditor(
+                            rules = draft,
+                            overriddenKeys = null,
+                            parentLabel = "",
+                            validationError = validationError,
+                            onActivate = {},
+                            onReset = {},
+                            onChange = { _, updated -> draft = updated },
+                            onEditText = { editText = it },
+                        )
+                    }
                 },
                 confirmButton = {
                     Button(
-                        enabled = validationError == null,
+                        enabled = validationError == null && !saveState.saving,
                         onClick = {
-                            store.update { it.copy(version = CONFIG_VERSION, global = draft) }
-                            showToast(localizedContext.getString(R.string.automation_global_settings_saved))
-                            onDismiss()
+                            saveState.submit(save = { putRule("GLOBAL", "", "", draft.asOverrides()) }, onSuccess = {
+                                showToast(localizedContext.getString(R.string.automation_global_settings_saved))
+                                onDismiss()
+                            })
                         }
                     ) { Text(stringResource(R.string.dialog_confirm)) }
                 },
-                dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.dialog_cancel)) } }
+                dismissButton = { TextButton(onDismiss, enabled = !saveState.saving) { Text(stringResource(R.string.dialog_cancel)) } }
             )
         }
     }
@@ -282,7 +288,7 @@ object TransferSettings {
                             context = context,
                             title = PaymentUiText.Raw(contact.displayName.ifBlank { contact.wxId }),
                             parentLabelRes = R.string.automation_global_settings,
-                            parent = store.get().global,
+                            parent = loadConfig().global,
                             initial = contactOverrides(contact.wxId),
                             onSave = {
                                 setContactOverrides(contact.wxId, it)
@@ -322,7 +328,7 @@ object TransferSettings {
                                         context = context,
                                         title = PaymentUiText.Resource(R.string.automation_group_global_settings),
                                         parentLabelRes = R.string.automation_global_settings,
-                                        parent = store.get().global,
+                                        parent = loadConfig().global,
                                         initial = contactOverrides(groupId),
                                         onSave = {
                                             setContactOverrides(groupId, it)
@@ -395,7 +401,7 @@ object TransferSettings {
                         context = context,
                         title = PaymentUiText.Raw(member.displayName.ifBlank { member.wxId }),
                         parentLabelRes = R.string.automation_group_global_settings,
-                        parent = store.get().global.apply(contactOverrides(groupId)),
+                        parent = loadConfig().global.apply(contactOverrides(groupId)),
                         initial = groupMemberOverrides(groupId, member.wxId),
                         onSave = {
                             setGroupMemberOverrides(groupId, member.wxId, it)
@@ -414,10 +420,12 @@ object TransferSettings {
         @androidx.annotation.StringRes parentLabelRes: Int,
         parent: RuleSet,
         initial: RuleOverrides,
-        onSave: (RuleOverrides) -> Unit
+        onSave: suspend (RuleOverrides) -> Unit
     ) {
         showComposeDialog(context) {
             val localizedContext by rememberUpdatedState(LocalWeKitLocalizedContext.current)
+            val saveState = rememberAutomationSaveState()
+            androidx.compose.runtime.SideEffect { dialog.setCancelable(!saveState.saving) }
             var draft by remember { mutableStateOf(initial) }
             var editText by remember { mutableStateOf<PaymentTextEditMode?>(null) }
             val effective = parent.apply(draft)
@@ -435,28 +443,31 @@ object TransferSettings {
                     .fillMaxHeight(),
                 title = { Text(title.resolve()) },
                 text = {
-                    RuleSetEditor(
-                        rules = effective,
-                        overriddenKeys = draft.keys(),
-                        parentLabel = stringResource(parentLabelRes),
-                        validationError = validationError,
-                        onActivate = { draft = draft.withRule(it, effective) },
-                        onReset = { draft = draft.withoutRule(it) },
-                        onChange = { key, updated -> draft = draft.withRule(key, updated) },
-                        onEditText = { editText = it },
-                    )
+                    AutomationSaveContent(saveState) {
+                        RuleSetEditor(
+                            rules = effective,
+                            overriddenKeys = draft.keys(),
+                            parentLabel = stringResource(parentLabelRes),
+                            validationError = validationError,
+                            onActivate = { draft = draft.withRule(it, effective) },
+                            onReset = { draft = draft.withoutRule(it) },
+                            onChange = { key, updated -> draft = draft.withRule(key, updated) },
+                            onEditText = { editText = it },
+                        )
+                    }
                 },
                 confirmButton = {
                     Button(
-                        enabled = validationError == null,
+                        enabled = validationError == null && !saveState.saving,
                         onClick = {
-                            onSave(draft)
-                            showToast(localizedContext.getString(R.string.settings_saved))
-                            onDismiss()
+                            saveState.submit(save = { onSave(draft) }, onSuccess = {
+                                showToast(localizedContext.getString(R.string.settings_saved))
+                                onDismiss()
+                            })
                         }
                     ) { Text(stringResource(R.string.dialog_confirm)) }
                 },
-                dismissButton = { TextButton(onDismiss) { Text(stringResource(R.string.dialog_cancel)) } }
+                dismissButton = { TextButton(onDismiss, enabled = !saveState.saving) { Text(stringResource(R.string.dialog_cancel)) } }
             )
         }
     }
@@ -679,30 +690,6 @@ object TransferSettings {
                     )
                 }
 
-                item(key = "send_record_to_self") {
-                    PaymentRuleRow(
-                        title = stringResource(R.string.payment_transfer_send_record_to_self),
-                        summary = stringResource(
-                            if (rules.sendRecordToSelf.enabled) {
-                                R.string.payment_transfer_send_record_to_self_enabled
-                            } else {
-                                R.string.automation_notification_disabled
-                            }
-                        ),
-                        checked = rules.sendRecordToSelf.enabled,
-                        overridden = overridden(RuleKey.SEND_RECORD_TO_SELF),
-                        parentLabel = parentLabel,
-                        onActivate = { onActivate(RuleKey.SEND_RECORD_TO_SELF) },
-                        onReset = { onReset(RuleKey.SEND_RECORD_TO_SELF) },
-                        onCheckedChange = {
-                            onChange(
-                                RuleKey.SEND_RECORD_TO_SELF,
-                                rules.copy(sendRecordToSelf = rules.sendRecordToSelf.copy(enabled = it)),
-                            )
-                        },
-                    )
-                }
-
                 item(key = "auto_reply") {
                     PaymentRuleRow(
                         title = stringResource(R.string.payment_transfer_auto_reply),
@@ -762,7 +749,6 @@ object TransferSettings {
             memoKeyword = overrides.memoKeyword ?: memoKeyword,
             delay = overrides.delay ?: delay,
             notification = overrides.notification ?: notification,
-            sendRecordToSelf = overrides.sendRecordToSelf ?: sendRecordToSelf,
             autoReply = overrides.autoReply ?: autoReply
         )
     }
@@ -774,7 +760,6 @@ object TransferSettings {
         if (memoKeyword != null) add(RuleKey.MEMO_KEYWORD)
         if (delay != null) add(RuleKey.DELAY)
         if (notification != null) add(RuleKey.NOTIFICATION)
-        if (sendRecordToSelf != null) add(RuleKey.SEND_RECORD_TO_SELF)
         if (autoReply != null) add(RuleKey.AUTO_REPLY)
     }
 
@@ -785,7 +770,6 @@ object TransferSettings {
         RuleKey.MEMO_KEYWORD -> copy(memoKeyword = rules.memoKeyword)
         RuleKey.DELAY -> copy(delay = rules.delay)
         RuleKey.NOTIFICATION -> copy(notification = rules.notification)
-        RuleKey.SEND_RECORD_TO_SELF -> copy(sendRecordToSelf = rules.sendRecordToSelf)
         RuleKey.AUTO_REPLY -> copy(autoReply = rules.autoReply)
     }
 
@@ -796,7 +780,6 @@ object TransferSettings {
         RuleKey.MEMO_KEYWORD -> copy(memoKeyword = null)
         RuleKey.DELAY -> copy(delay = null)
         RuleKey.NOTIFICATION -> copy(notification = null)
-        RuleKey.SEND_RECORD_TO_SELF -> copy(sendRecordToSelf = null)
         RuleKey.AUTO_REPLY -> copy(autoReply = null)
     }
 
@@ -871,49 +854,61 @@ object TransferSettings {
     }.getOrDefault(emptyList())
 
     private fun contactOverrides(wxId: String): RuleOverrides =
-        store.get().contacts[wxId] ?: RuleOverrides()
+        loadConfig().contacts[wxId] ?: RuleOverrides()
 
     private fun groupMemberOverrides(groupId: String, memberId: String): RuleOverrides =
-        store.get().groupMembers[groupId]?.get(memberId) ?: RuleOverrides()
+        loadConfig().groupMembers[groupId]?.get(memberId) ?: RuleOverrides()
 
     private fun memberOverridesCount(groupId: String): Int =
-        store.get().groupMembers[groupId]?.count { !it.value.isEmpty() } ?: 0
+        loadConfig().groupMembers[groupId]?.count { !it.value.isEmpty() } ?: 0
 
-    private fun setContactOverrides(wxId: String, overrides: RuleOverrides) {
-        store.update { config ->
-            val contacts = config.contacts.toMutableMap()
-            if (overrides.isEmpty()) contacts.remove(wxId) else contacts[wxId] = overrides
-            config.copy(version = CONFIG_VERSION, contacts = contacts)
+    private suspend fun setContactOverrides(wxId: String, overrides: RuleOverrides) {
+        putRule("CONTACT", wxId, "", overrides)
+    }
+
+    private suspend fun setGroupMemberOverrides(groupId: String, memberId: String, overrides: RuleOverrides) {
+        putRule("GROUP_MEMBER", groupId, memberId, overrides)
+    }
+
+    private fun loadConfig(): StoredConfig {
+        JsonDataMigration.requireCompleted("json", "TransferSettings")
+        cachedConfig?.let { return it }
+        return runBlocking(Dispatchers.IO) {
+            WeKitDatabase.instance.automationDao().getTransferConfig()
+                .also { cachedConfig = it }
         }
     }
 
-    private fun setGroupMemberOverrides(groupId: String, memberId: String, overrides: RuleOverrides) {
-        store.update { config ->
-            val groups = config.groupMembers.toMutableMap()
-            val members = groups[groupId].orEmpty().toMutableMap()
-            if (overrides.isEmpty()) members.remove(memberId) else members[memberId] = overrides
-            if (members.isEmpty()) groups.remove(groupId) else groups[groupId] = members
-            config.copy(version = CONFIG_VERSION, groupMembers = groups)
+    private suspend fun putRule(scopeType: String, talkerId: String, memberId: String, rules: RuleOverrides) {
+        JsonDataMigration.requireCompleted("json", "TransferSettings")
+        withContext(Dispatchers.IO) {
+            try {
+                WeKitDatabase.instance.automationDao().putTransferRule(scopeType, talkerId, memberId, rules)
+            } finally {
+                // Also clear on cancellation: the SQL transaction may already have committed.
+                cachedConfig = null
+            }
         }
     }
 
-    private fun migrateLegacyConfig(): StoredConfig {
-        val hasLegacyPrefs = LEGACY_PREF_KEYS.any(WePrefs::containsKey)
+    fun migrateLegacyConfig(): StoredConfig {
+        KvStore.requireMigrationKeys(legacyPreferenceKeys)
+        val hasLegacyPrefs = legacyPreferenceKeys.any(KvStore::containsKey)
         if (!hasLegacyPrefs) return StoredConfig()
 
-        val useWhitelist = WePrefs.getBoolOrDef("transfer_use_whitelist", false)
+        val useWhitelist = KvStore.getBoolOrDef("transfer_use_whitelist", false)
         val selected = if (useWhitelist) {
-            WePrefs.getStringSetOrDef("transfer_whitelist", emptySet())
+            KvStore.getStringSetOrDef("transfer_whitelist", emptySet())
         } else {
-            WePrefs.getStringSetOrDef("transfer_blacklist", emptySet())
+            KvStore.getStringSetOrDef("transfer_blacklist", emptySet())
         }
-        val delayBase = WePrefs.getStringOrDef("transfer_delay_custom", "500")
-        val delayRange = WePrefs.getStringOrDef("transfer_delay_random_range", "300")
+        val delayBase = KvStore.getStringOrDef("transfer_delay_custom", "500")
+        val delayRange = KvStore.getStringOrDef("transfer_delay_random_range", "300")
         val global = RuleSet(
             accept = AutomationToggleRule(enabled = !useWhitelist),
             delay = DelayRule(enabled = true, baseMs = delayBase, randomRangeMs = delayRange),
-            notification = AutomationToggleRule(WePrefs.getBoolOrDef("transfer_notification", false)),
-            autoReply = WePrefs.getStringOrDef("transfer_auto_reply", "").let {
+            notification = AutomationToggleRule(KvStore.getBoolOrDef("transfer_notification", false)),
+            autoReply = KvStore.getStringOrDef("transfer_auto_reply", "").let {
                 ReplyRule(enabled = it.isNotBlank(), text = it)
             }
         )
@@ -924,7 +919,7 @@ object TransferSettings {
         return StoredConfig(global = global, contacts = contacts)
     }
 
-    private val LEGACY_PREF_KEYS = listOf(
+    private val legacyPreferenceKeys = listOf(
         "transfer_notification",
         "transfer_use_whitelist",
         "transfer_whitelist",

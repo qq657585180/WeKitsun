@@ -50,7 +50,7 @@ object WeAgentRepository {
      */
     private const val TOOL_PAYLOAD_SEP = '\u0000'
 
-    private val db get() = WeAgentDatabase.instance
+    private val db get() = WeKitDatabase.instance
 
     suspend fun appendBridgeToolAudit(entry: dev.sun.wechat.agent.bridge.ToolBridgeSession.AuditEntry) {
         db.bridgeToolAuditDao().insert(

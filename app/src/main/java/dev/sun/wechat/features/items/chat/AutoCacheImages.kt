@@ -21,7 +21,7 @@ import dev.sun.wechat.features.api.core.WeMessageApi
 import dev.sun.wechat.features.api.core.models.MessageType
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.ContactsSelector
 import dev.sun.wechat.ui.content.TextButton
@@ -44,9 +44,9 @@ object AutoCacheImages : ClickableFeature(), WeDatabaseListenerApi.IInsertListen
 
     private const val TAG = "AutoCacheImages"
 
-    private var useWhitelist by WePrefs.prefOption("autocache_images_use_whitelist", false)
-    private var whitelist by WePrefs.prefOption("autocache_images_whitelist", emptySet())
-    private var blacklist by WePrefs.prefOption("autocache_images_blacklist", emptySet())
+    private var useWhitelist by KvStore.prefOption("autocache_images_use_whitelist", false)
+    private var whitelist by KvStore.prefOption("autocache_images_whitelist", emptySet())
+    private var blacklist by KvStore.prefOption("autocache_images_blacklist", emptySet())
 
     override fun onEnable() {
         WeDatabaseListenerApi.addListener(this)

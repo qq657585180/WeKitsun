@@ -70,7 +70,7 @@ import dev.sun.wechat.features.items.debug.ResetDexCache
 import dev.sun.wechat.i18n.LanguageSelection
 import dev.sun.wechat.i18n.WeKitLocaleController
 import dev.sun.wechat.i18n.LocalWeKitLocalizedContext
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.nuke.NukeButton
 import dev.sun.wechat.ui.content.nuke.NukeCategoryIcon
 import dev.sun.wechat.ui.content.nuke.NukeCountAndChevron
@@ -393,7 +393,7 @@ private fun NukeBooleanPreference(
     imageVector: ImageVector,
     default: Boolean = false,
 ) {
-    var checked by remember(key, default) { mutableStateOf(WePrefs.getBoolOrDef(key, default)) }
+    var checked by remember(key, default) { mutableStateOf(KvStore.getBoolOrDef(key, default)) }
     NukePreferenceRow(
         title = title,
         description = description,
@@ -403,13 +403,13 @@ private fun NukeBooleanPreference(
                 checked = checked,
                 onCheckedChange = {
                     checked = it
-                    WePrefs.putBool(key, it)
+                    KvStore.putBool(key, it)
                 },
             )
         },
         onClick = {
             checked = !checked
-            WePrefs.putBool(key, checked)
+            KvStore.putBool(key, checked)
         },
     )
 }

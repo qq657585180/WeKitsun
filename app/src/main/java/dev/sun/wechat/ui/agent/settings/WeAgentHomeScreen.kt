@@ -38,7 +38,7 @@ import dev.sun.wechat.agent.tool.PermissionLevel
 import dev.sun.wechat.agent.tool.ToolLoadingMode
 import dev.sun.wechat.features.api.agent.WeAgentService
 import dev.sun.wechat.features.items.system.agent.WeAgentOverlayController
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.m3.BaseWidget
 import dev.sun.wechat.ui.content.m3.DropDownMenuWidget
 import dev.sun.wechat.ui.content.m3.DropdownOption
@@ -76,7 +76,7 @@ fun WeAgentHomeScreen(onOpen: (AgentSettingsRoute) -> Unit) {
     LaunchedEffect(Unit) {
         dynamicTools = WeAgentSettings.toolLoadingMode() == ToolLoadingMode.DYNAMIC
         overlayMode = WeAgentSettings.overlayMode()
-        dockToEdge = WePrefs.getBoolOrDef(WeAgentOverlayController.PREF_BALL_DOCK_TO_EDGE_KEY, false)
+        dockToEdge = KvStore.getBoolOrDef(WeAgentOverlayController.PREF_BALL_DOCK_TO_EDGE_KEY, false)
         sendWhileRunning = WeAgentSettings.sendWhileRunningMode()
         smallModelId = WeAgentSettings.smallModelId()
         defaultModelId = WeAgentSettings.defaultModelId()

@@ -17,7 +17,7 @@ import dev.sun.wechat.features.api.ui.WeMomentsApi
 import dev.sun.wechat.features.api.core.WeMessageApi
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.TextButton
 import dev.sun.wechat.ui.content.m3.RadioButtonWidget
@@ -38,7 +38,7 @@ object NoCompressUploadedImages : ClickableFeature(), IResolveDex {
     private const val MODE_CONVERT = 0
     private const val MODE_COPY = 1
 
-    private var selectedMode by WePrefs.prefOption("no_compress_mode", MODE_CONVERT)
+    private var selectedMode by KvStore.prefOption("no_compress_mode", MODE_CONVERT)
 
     private val methodCreatePic by dexMethod {
         matcher {

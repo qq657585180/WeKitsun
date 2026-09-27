@@ -21,7 +21,7 @@ import dev.sun.wechat.dexkit.abc.IResolveDex
 import dev.sun.wechat.dexkit.dsl.dexClass
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.TextButton
 import dev.sun.wechat.ui.content.m3.BaseItemContainer
@@ -104,7 +104,7 @@ object ApplyDialogBackgroundBlur : ClickableFeature(), IResolveDex {
             }
 
             addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-            attributes.blurBehindRadius = WePrefs.getIntOrDef(KEY_BLUR_RADIUS, DEFAULT_BLUR_RADIUS)
+            attributes.blurBehindRadius = KvStore.getIntOrDef(KEY_BLUR_RADIUS, DEFAULT_BLUR_RADIUS)
         }
     }
 
@@ -112,7 +112,7 @@ object ApplyDialogBackgroundBlur : ClickableFeature(), IResolveDex {
         showComposeDialog(context) {
             var blurRadius by remember {
                 mutableIntStateOf(
-                    WePrefs.getIntOrDef(
+                    KvStore.getIntOrDef(
                         KEY_BLUR_RADIUS, DEFAULT_BLUR_RADIUS
                     )
                 )
@@ -141,7 +141,7 @@ object ApplyDialogBackgroundBlur : ClickableFeature(), IResolveDex {
                                     valueSuffix = "px",
                                     onValueChange = {
                                         blurRadius = it
-                                        WePrefs.putInt(KEY_BLUR_RADIUS, it)
+                                        KvStore.putInt(KEY_BLUR_RADIUS, it)
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                             window.attributes.blurBehindRadius = it
                                             window.attributes = window.attributes // trigger onWindowAttributesChanged

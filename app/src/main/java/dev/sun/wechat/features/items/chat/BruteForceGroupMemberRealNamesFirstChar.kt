@@ -69,7 +69,7 @@ object BruteForceGroupMemberRealNamesFirstChar : SwitchFeature(),
 
     // ── Result cache ──────────────────────────────────────────────────────────
 
-    private val cacheFile by lazy { KnownPaths.moduleData / "real_names_first_char.json" }
+    private val cacheFile by lazy { KnownPaths.moduleRoot / "real_names_first_char.json" }
 
     /**
      * wxId → confirmed real-name first char. Only hits are stored.
@@ -102,7 +102,7 @@ object BruteForceGroupMemberRealNamesFirstChar : SwitchFeature(),
      * Entries are written when a rate-limit retcode is encountered, and cleared on a confirmed
      * hit, manual cancellation, or loop exhaustion so stale progress never blocks a fresh run.
      */
-    private val progressFile by lazy { KnownPaths.moduleData / "real_names_first_char_progress.json" }
+    private val progressFile by lazy { KnownPaths.moduleRoot / "real_names_first_char_progress.json" }
     private val savedProgress = ConcurrentHashMap<String, Int>()
 
     private fun loadProgress() {

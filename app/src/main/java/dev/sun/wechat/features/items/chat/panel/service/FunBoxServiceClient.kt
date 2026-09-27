@@ -2,7 +2,7 @@ package dev.sun.wechat.features.items.chat.panel.service
 
 import dev.sun.wechat.R
 import dev.sun.wechat.features.items.chat.localizedChatString
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.utils.WeLogger
 import dev.sun.wechat.utils.serialization.DefaultJson
 import kotlinx.coroutines.CancellationException
@@ -171,10 +171,10 @@ object FunBoxServiceClient {
     }
 
     @Synchronized
-    private fun cachedApiHost() = WePrefs.getString(API_CACHE_KEY).orEmpty()
+    private fun cachedApiHost() = KvStore.getString(API_CACHE_KEY).orEmpty()
 
     @Synchronized
-    private fun cachedObjectHost() = WePrefs.getString(OBJECT_CACHE_KEY).orEmpty()
+    private fun cachedObjectHost() = KvStore.getString(OBJECT_CACHE_KEY).orEmpty()
 
     private fun apiHost(excludedHost: String? = null): String {
         cachedApiHost().takeIf { it.isNotBlank() && it != excludedHost }?.let {
@@ -185,7 +185,7 @@ object FunBoxServiceClient {
         val resolved = resolveCandidates()
         val host = resolved.first.firstOrNull { candidate -> candidate != excludedHost && probeApi(candidate) }
             ?: error(localizedChatString(R.string.chat_funbox_api_unreachable))
-        WePrefs.putString(API_CACHE_KEY, host)
+        KvStore.putString(API_CACHE_KEY, host)
         WeLogger.i(TAG, "selected API host=$host")
         return host
     }
@@ -199,7 +199,7 @@ object FunBoxServiceClient {
         val resolved = resolveCandidates()
         val host = resolved.second.firstOrNull { candidate -> candidate != excludedHost && probeObject(candidate) }
             ?: error(localizedChatString(R.string.chat_funbox_object_service_unreachable))
-        WePrefs.putString(OBJECT_CACHE_KEY, host)
+        KvStore.putString(OBJECT_CACHE_KEY, host)
         WeLogger.i(TAG, "selected object host=$host")
         return host
     }
@@ -301,7 +301,7 @@ object FunBoxServiceClient {
     @Synchronized
     private fun invalidateApiHost(host: String) {
         if (cachedApiHost() == host) {
-            WePrefs.putString(API_CACHE_KEY, "")
+            KvStore.putString(API_CACHE_KEY, "")
             WeLogger.i(TAG, "invalidated API host=$host")
         }
     }
@@ -309,7 +309,7 @@ object FunBoxServiceClient {
     @Synchronized
     private fun invalidateObjectHost(host: String) {
         if (cachedObjectHost() == host) {
-            WePrefs.putString(OBJECT_CACHE_KEY, "")
+            KvStore.putString(OBJECT_CACHE_KEY, "")
             WeLogger.i(TAG, "invalidated object host=$host")
         }
     }

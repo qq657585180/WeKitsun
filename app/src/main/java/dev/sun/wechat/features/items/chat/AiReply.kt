@@ -66,7 +66,7 @@ import dev.sun.wechat.features.api.core.models.MessageType
 import dev.sun.wechat.features.api.ui.WeChatMessageContextMenuApi
 import dev.sun.wechat.features.core.FeatureCategoryIds
 import dev.sun.wechat.features.core.SwitchFeature
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.agent.settings.label
 import dev.sun.wechat.ui.content.Button
 import dev.sun.wechat.ui.content.TextButton

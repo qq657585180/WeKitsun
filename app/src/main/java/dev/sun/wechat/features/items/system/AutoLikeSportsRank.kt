@@ -29,7 +29,7 @@ import dev.sun.wechat.features.api.core.WeDatabaseListenerApi
 import dev.sun.wechat.features.api.net.WeNetSceneApi
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.ContactsSelector
 import dev.sun.wechat.ui.content.TextButton
@@ -72,10 +72,10 @@ object AutoLikeSportsRank : ClickableFeature(), IResolveDex,
         }
     }
 
-    private var minScore by WePrefs.prefOption("sports_rank_min_score", 0)
-    private var useWhitelist by WePrefs.prefOption("sports_rank_use_whitelist", false)
-    private var whitelist by WePrefs.prefOption("sports_rank_whitelist", emptySet())
-    private var blacklist by WePrefs.prefOption("sports_rank_blacklist", emptySet())
+    private var minScore by KvStore.prefOption("sports_rank_min_score", 0)
+    private var useWhitelist by KvStore.prefOption("sports_rank_use_whitelist", false)
+    private var whitelist by KvStore.prefOption("sports_rank_whitelist", emptySet())
+    private var blacklist by KvStore.prefOption("sports_rank_blacklist", emptySet())
 
     private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 

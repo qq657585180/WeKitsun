@@ -33,7 +33,7 @@ import dev.sun.wechat.dexkit.abc.IResolveDex
 import dev.sun.wechat.dexkit.dsl.dexMethod
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs.Companion.prefOption
+import dev.sun.wechat.data.KvStore.prefOption
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.TextButton
 import dev.sun.wechat.ui.content.m3.BaseWidget
@@ -65,7 +65,7 @@ object VirtualVoipVideo : ClickableFeature(), IResolveDex {
     private val VIDEO_PATH by lazy {
         val target = KnownPaths.moduleAssets / VIDEO_FILE
         // 旧版本把导入的视频存放在 moduleData 根目录，自动迁移到 moduleAssets
-        val legacy = KnownPaths.moduleData / VIDEO_FILE
+        val legacy = KnownPaths.moduleRoot / VIDEO_FILE
         if (legacy.exists() && !target.exists()) {
             runCatching { legacy.moveTo(target) }
                 .onFailure { WeLogger.w(TAG, "failed to migrate virtual voip video into moduleAssets", it) }

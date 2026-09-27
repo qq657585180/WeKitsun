@@ -23,7 +23,7 @@ import dev.sun.wechat.features.items.system.agent.WeAgentOverlayController.shoul
 import dev.sun.wechat.i18n.LocaleResourceMode
 import dev.sun.wechat.i18n.LocalizedContextFactory
 import dev.sun.wechat.i18n.WeKitLocaleController
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.agent.WeAgentBall
 import dev.sun.wechat.ui.agent.WeAgentPanel
 import dev.sun.wechat.ui.utils.LifecycleOwnerProvider
@@ -98,18 +98,18 @@ object WeAgentOverlayController {
     fun setDockToEdge(enabled: Boolean) {
         if (dockToEdge == enabled) return
         dockToEdge = enabled
-        WePrefs.putBool(PREF_BALL_DOCK_TO_EDGE_KEY, enabled)
+        KvStore.putBool(PREF_BALL_DOCK_TO_EDGE_KEY, enabled)
         val v = ballView ?: return
         val p = ballParams ?: return
         if (enabled) {
             val target = dockedTargetX(v, p, nearestEdgeOf(v, p))
             animateXTo(v, p, target)
-            WePrefs.putInt(PREF_BALL_X, target)
+            KvStore.putInt(PREF_BALL_X, target)
         } else {
             val target = expandedTargetX(v, p)
             animateXTo(v, p, target)
             // 关闭贴边时持久化展开位置，避免下次 attach 从负 x 恢复导致球不可见
-            WePrefs.putInt(PREF_BALL_X, target)
+            KvStore.putInt(PREF_BALL_X, target)
         }
     }
 
@@ -182,11 +182,11 @@ object WeAgentOverlayController {
     // -----------------------------------------------------------------------------------------
 
     private fun addBall() {
-        dockToEdge = WePrefs.getBoolOrDef(PREF_BALL_DOCK_TO_EDGE_KEY, false)
+        dockToEdge = KvStore.getBoolOrDef(PREF_BALL_DOCK_TO_EDGE_KEY, false)
         val params = baseLayoutParams(focusable = false).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = WePrefs.getIntOrDef(PREF_BALL_X, 24)
-            y = WePrefs.getIntOrDef(PREF_BALL_Y, 240)
+            x = KvStore.getIntOrDef(PREF_BALL_X, 24)
+            y = KvStore.getIntOrDef(PREF_BALL_Y, 240)
             // 允许窗口移出屏幕边界：贴边隐藏时球大部移出屏幕，只留窄边。
             // 若无此 flag，FLAG_LAYOUT_IN_SCREEN 会把负 x 裁剪回 0，导致"靠边不隐藏"。
             flags = flags or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
@@ -205,7 +205,7 @@ object WeAgentOverlayController {
                             val p0 = ballParams
                             if (dockToEdge && v0 != null && p0 != null && isDockedHidden(v0, p0)) {
                                 animateXTo(v0, p0, expandedTargetX(v0, p0))
-                                WePrefs.putInt(PREF_BALL_X, p0.x)
+                                KvStore.putInt(PREF_BALL_X, p0.x)
                             } else {
                                 togglePanel()
                             }
@@ -231,13 +231,13 @@ object WeAgentOverlayController {
                                     val target = dockedTargetX(v, p, edge)
                                     // y 保持拖动结束位置；x 滑入到贴边收起位
                                     animateXTo(v, p, target)
-                                    WePrefs.putInt(PREF_BALL_X, target)
+                                    KvStore.putInt(PREF_BALL_X, target)
                                 } else {
                                     clampToScreen(v, p)
                                     runCatching { wm.updateViewLayout(v, p) }
-                                    WePrefs.putInt(PREF_BALL_X, p.x)
+                                    KvStore.putInt(PREF_BALL_X, p.x)
                                 }
-                                WePrefs.putInt(PREF_BALL_Y, p.y)
+                                KvStore.putInt(PREF_BALL_Y, p.y)
                             }
                         },
                     )
@@ -255,7 +255,7 @@ object WeAgentOverlayController {
             val target = expandedTargetX(view, params)
             params.x = target
             runCatching { wm.updateViewLayout(view, params) }
-            WePrefs.putInt(PREF_BALL_X, target)
+            KvStore.putInt(PREF_BALL_X, target)
         }
     }
 

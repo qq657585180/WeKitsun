@@ -22,7 +22,7 @@ import dev.sun.wechat.features.api.core.models.MessageInfo
 import dev.sun.wechat.features.api.core.models.MessageType
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.ContactsSelector
 import dev.sun.wechat.ui.content.TextButton
@@ -55,9 +55,9 @@ object AutoCacheFiles : ClickableFeature(),
 
     private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    private var useWhitelist by WePrefs.prefOption("autocache_files_use_whitelist", false)
-    private var whitelist by WePrefs.prefOption("autocache_files_whitelist", emptySet())
-    private var blacklist by WePrefs.prefOption("autocache_files_blacklist", emptySet())
+    private var useWhitelist by KvStore.prefOption("autocache_files_use_whitelist", false)
+    private var whitelist by KvStore.prefOption("autocache_files_whitelist", emptySet())
+    private var blacklist by KvStore.prefOption("autocache_files_blacklist", emptySet())
 
     override fun onEnable() {
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())

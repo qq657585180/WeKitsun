@@ -4,7 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import dev.sun.wechat.features.api.core.WeMessageApi
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.utils.WeLogger
 import dev.sun.wechat.utils.android.showToastSuspend
 import kotlinx.coroutines.CoroutineScope
@@ -28,7 +28,7 @@ import kotlin.time.Duration.Companion.milliseconds
  * - 标签：把若干群聊 wxid 打包成一个名字，发消息时按标签一键选定目标。
  * - 任务：一条消息 + 每天发送时间(HH:mm) + 目标(标签和/或手选群)，到点自动群发，每天只发一次。
  *
- * 数据以 JSON 存在 [WePrefs]；调度器在微信主进程存活期间每分钟检查一次到点任务。
+ * 数据以 JSON 存在 [KvStore]；调度器在微信主进程存活期间每分钟检查一次到点任务。
  */
 internal object MassTaskStore {
 
@@ -77,7 +77,7 @@ internal object MassTaskStore {
     }
 
     fun saveTasks() {
-        WePrefs.putString(KEY_TASKS, JSONArray().apply {
+        KvStore.putString(KEY_TASKS, JSONArray().apply {
             tasks.forEach { t ->
                 put(JSONObject()
                     .put("id", t.id)
@@ -93,7 +93,7 @@ internal object MassTaskStore {
     }
 
     fun saveTags() {
-        WePrefs.putString(KEY_TAGS, JSONArray().apply {
+        KvStore.putString(KEY_TAGS, JSONArray().apply {
             tags.forEach { tag ->
                 put(JSONObject()
                     .put("name", tag.name)
@@ -137,7 +137,7 @@ internal object MassTaskStore {
     // ---------------- JSON 解析 ----------------
 
     private fun loadTasks(): List<MassTask> = runCatching {
-        val raw = WePrefs.getString(KEY_TASKS) ?: return emptyList()
+        val raw = KvStore.getString(KEY_TASKS) ?: return emptyList()
         val array = JSONArray(raw)
         (0 until array.length()).mapNotNull { i ->
             val o = array.getJSONObject(i)
@@ -167,7 +167,7 @@ internal object MassTaskStore {
     }
 
     private fun loadTags(): List<MassTag> = runCatching {
-        val raw = WePrefs.getString(KEY_TAGS) ?: return emptyList()
+        val raw = KvStore.getString(KEY_TAGS) ?: return emptyList()
         val array = JSONArray(raw)
         (0 until array.length()).map { i ->
             val o = array.getJSONObject(i)

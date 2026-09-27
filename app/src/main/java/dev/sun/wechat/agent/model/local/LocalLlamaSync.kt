@@ -1,7 +1,7 @@
 package dev.sun.wechat.agent.model.local
 
 import androidx.room.withTransaction
-import dev.sun.wechat.agent.data.WeAgentDatabase
+import dev.sun.wechat.data.WeKitDatabase
 import dev.sun.wechat.agent.data.WeAgentRepository
 import dev.sun.wechat.agent.data.entity.ModelEntity
 import dev.sun.wechat.agent.data.entity.ModelProviderEntity
@@ -71,7 +71,7 @@ object LocalLlamaSync {
     }
 
     private suspend fun syncPass() {
-        val db = WeAgentDatabase.instance
+        val db = WeKitDatabase.instance
         val canonicalProvider = ModelProviderEntity(
             id = LocalLlama.PROVIDER_ID,
             type = ModelProviderType.LOCAL_LLAMA,

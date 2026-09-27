@@ -15,7 +15,7 @@ import dev.sun.wechat.features.api.ui.WeCurrentConversationApi
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
 import dev.sun.wechat.features.items.chat.panel.voice.TIAX_PRESET_VOICES
-import dev.sun.wechat.preferences.WePrefs
+import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.utils.AudioUtils
 import dev.sun.wechat.utils.HostInfo
 import dev.sun.wechat.utils.MultiEngineTtsClient
@@ -51,25 +51,25 @@ object AiVoiceAssistant : ClickableFeature(), WeDatabaseListenerApi.IInsertListe
     override val noSwitchWidget = true
 
     // ---- 配置 ----
-    var autoReplyEnabled by WePrefs.prefOption("aivoice_enabled", false)
-    var triggerWord by WePrefs.prefOption("aivoice_trigger", "*")
-    var memoryRounds by WePrefs.prefOption("aivoice_memory_rounds", 5)
-    var voiceOnly by WePrefs.prefOption("aivoice_voice_only", true)
-    var weAgentModelId by WePrefs.prefOption("aivoice_weagent_model", "")
-    var prompt by WePrefs.prefOption("aivoice_prompt", "你是一个乐于助人的AI助手")
+    var autoReplyEnabled by KvStore.prefOption("aivoice_enabled", false)
+    var triggerWord by KvStore.prefOption("aivoice_trigger", "*")
+    var memoryRounds by KvStore.prefOption("aivoice_memory_rounds", 5)
+    var voiceOnly by KvStore.prefOption("aivoice_voice_only", true)
+    var weAgentModelId by KvStore.prefOption("aivoice_weagent_model", "")
+    var prompt by KvStore.prefOption("aivoice_prompt", "你是一个乐于助人的AI助手")
 
     // ---- TTS 引擎配置 ----
-    var engine by WePrefs.prefOption("aivoice_engine", "fishaudio")
-    var fishKey by WePrefs.prefOption("aivoice_fish_key", "")
-    var fishVoice by WePrefs.prefOption("aivoice_fish_voice", "")
-    var yxKey by WePrefs.prefOption("aivoice_yx_key", "")
-    var yxVoice by WePrefs.prefOption("aivoice_yx_voice", "")
-    var bvKey by WePrefs.prefOption("aivoice_bv_key", "")
-    var bvVoice by WePrefs.prefOption("aivoice_bv_voice", "")
-    var vocuKey by WePrefs.prefOption("aivoice_vocu_key", "")
-    var vocuVoice by WePrefs.prefOption("aivoice_vocu_voice", "")
-    var tiaxKey by WePrefs.prefOption("aivoice_tiax_key", "")
-    var tiaxVoice by WePrefs.prefOption("aivoice_tiax_voice", "")
+    var engine by KvStore.prefOption("aivoice_engine", "fishaudio")
+    var fishKey by KvStore.prefOption("aivoice_fish_key", "")
+    var fishVoice by KvStore.prefOption("aivoice_fish_voice", "")
+    var yxKey by KvStore.prefOption("aivoice_yx_key", "")
+    var yxVoice by KvStore.prefOption("aivoice_yx_voice", "")
+    var bvKey by KvStore.prefOption("aivoice_bv_key", "")
+    var bvVoice by KvStore.prefOption("aivoice_bv_voice", "")
+    var vocuKey by KvStore.prefOption("aivoice_vocu_key", "")
+    var vocuVoice by KvStore.prefOption("aivoice_vocu_voice", "")
+    var tiaxKey by KvStore.prefOption("aivoice_tiax_key", "")
+    var tiaxVoice by KvStore.prefOption("aivoice_tiax_voice", "")
 
     // ---- 对话记忆 ----
     private val memories = ConcurrentHashMap<String, MutableList<JSONObject>>()
