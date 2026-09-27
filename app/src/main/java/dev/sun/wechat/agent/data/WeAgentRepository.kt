@@ -28,6 +28,7 @@ import dev.sun.wechat.agent.environment.LinuxEnvironmentSessionTransition
 import dev.sun.wechat.agent.environment.toSnapshot
 import dev.sun.wechat.agent.environment.NATIVE_ENVIRONMENT_ID
 import dev.sun.wechat.agent.tool.PermissionLevel
+import dev.sun.wechat.data.WeKitDatabase
 import dev.sun.wechat.utils.WeLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine

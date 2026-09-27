@@ -5,6 +5,7 @@ import dev.sun.wechat.agent.data.entity.SettingEntity
 import dev.sun.wechat.agent.model.local.LocalLlama
 import dev.sun.wechat.agent.tool.PermissionLevel
 import dev.sun.wechat.agent.tool.ToolLoadingMode
+import dev.sun.wechat.data.WeKitDatabase
 import java.util.concurrent.ConcurrentHashMap
 
 /**
