@@ -17,7 +17,6 @@ import dev.sun.wechat.dexkit.abc.IResolveDex
 import dev.sun.wechat.dexkit.dsl.data
 import dev.sun.wechat.dexkit.dsl.dexClass
 import dev.sun.wechat.dexkit.dsl.dexMethod
-import dev.sun.wechat.features.api.core.WeApi
 import dev.sun.wechat.features.api.core.WeDatabaseApi
 import dev.sun.wechat.features.api.core.WeDatabaseListenerApi
 import dev.sun.wechat.features.api.core.WeMessageApi
@@ -118,7 +117,6 @@ object AutoOpenRedPackets : ClickableFeature(), WeDatabaseListenerApi.IInsertLis
         val headImg: String = "",
         val nickName: String = "",
         val notificationEnabled: Boolean = false,
-        val sendRecordToSelf: Boolean = false,
         val autoReply: String = ""
     )
 
@@ -128,6 +126,7 @@ object AutoOpenRedPackets : ClickableFeature(), WeDatabaseListenerApi.IInsertLis
     }
 
     override fun onEnable() {
+        RedPacketSettings.requireReady()
         WeDatabaseListenerApi.addListener(this)
 
         WePaymentApi.methodReceiveLuckyMoneyOnGYNetEnd.hookAfter {
@@ -235,7 +234,6 @@ object AutoOpenRedPackets : ClickableFeature(), WeDatabaseListenerApi.IInsertLis
                 headImg = headImg,
                 nickName = nickName,
                 notificationEnabled = settings.notification.enabled,
-                sendRecordToSelf = settings.sendRecordToSelf.enabled,
                 autoReply = settings.autoReply.text.takeIf { settings.autoReply.enabled }.orEmpty()
             )
             currentRedPacketMap[sendId] = info
@@ -389,20 +387,7 @@ object AutoOpenRedPackets : ClickableFeature(), WeDatabaseListenerApi.IInsertLis
 
         val reply = info.autoReply
         if (reply.isNotBlank()) {
-            // 回复内容每行一条，随机选一条(Nuke 同款)
-            val candidates = reply.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
-            val picked = candidates.randomOrNull() ?: reply
-            WeMessageApi.sendText(info.talker, picked.replace($$"$amount", "¥$displayAmount"))
-        }
-
-        if (info.sendRecordToSelf) {
-            runCatching {
-                val self = WeApi.selfWxId
-                if (self.isNotBlank()) {
-                    val sourceName = WeDatabaseApi.getDisplayName(info.talker)
-                    WeMessageApi.sendText(self, "已领取 $sourceName 的红包 ¥$displayAmount")
-                }
-            }.onFailure { WeLogger.w(TAG, "send record to self failed", it) }
+            WeMessageApi.sendText(info.talker, reply.replace($$"$amount", "¥$displayAmount"))
         }
 
         if (!info.notificationEnabled) return

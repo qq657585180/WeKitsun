@@ -38,6 +38,7 @@ object AutoAcceptTransfers : ClickableFeature(), WeDatabaseListenerApi.IInsertLi
     private const val TAG = "AutoAcceptTransfers"
 
     override fun onEnable() {
+        TransferSettings.requireReady()
         WeDatabaseListenerApi.addListener(this)
     }
 
@@ -124,20 +125,10 @@ object AutoAcceptTransfers : ClickableFeature(), WeDatabaseListenerApi.IInsertLi
                 WeLogger.i(TAG, "called WePaymentApi.confirmTransfer")
 
                 if (rules.autoReply.enabled) {
-                    // 回复内容每行一条随机
-                    val candidates = rules.autoReply.text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
-                    val picked = candidates.randomOrNull() ?: rules.autoReply.text
-                    WeMessageApi.sendText(msgInfo.talker, picked.replace($$"$amount", transferMsg.feedesc))
-                }
-
-                if (rules.sendRecordToSelf.enabled) {
-                    runCatching {
-                        val self = WeApi.selfWxId
-                        if (self.isNotBlank()) {
-                            val sourceName = WeDatabaseApi.getDisplayName(payerUsername)
-                            WeMessageApi.sendText(self, "已收款 $sourceName 的转账 ${transferMsg.feedesc}")
-                        }
-                    }.onFailure { WeLogger.w(TAG, "send record to self failed", it) }
+                    WeMessageApi.sendText(
+                        msgInfo.talker,
+                        rules.autoReply.text.replace($$"$amount", transferMsg.feedesc)
+                    )
                 }
 
                 if (!rules.notification.enabled) return@thread

@@ -11,7 +11,7 @@ import dev.sun.wechat.features.core.FeatureCategoryIds
  *
  * 任务在 [ScheduledTaskActivity] 中管理；启用后 [ScheduledTaskRuntime] 在微信主进程存活期间调度发送。
  */
-object ScheduledTask : ClickableFeature() {
+object ScheduledTaskFeature : ClickableFeature() {
 
     override val technicalId = "定时任务"
     override val nameRes = R.string.feature_scheduled_task_name

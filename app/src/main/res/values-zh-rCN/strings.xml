@@ -4377,4 +4377,5 @@
     <string name="structured_storage_saving">正在保存…</string>
     <string name="structured_storage_unavailable">此功能的数据未能加载。请检查迁移日志并重启微信重试。</string>
     <string name="system_qr_code_record_clear_description">确定清空所有扫描记录吗？此操作无法撤销。</string>
+    <string name="nav_use_wechat_icons">使用微信原生图标</string>
 </resources>
