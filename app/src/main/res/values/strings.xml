@@ -4350,4 +4350,5 @@
     <string name="structured_storage_unavailable">This feature’s data could not be loaded. Check the migration logs and restart WeChat to retry.</string>
     <string name="system_qr_code_record_clear_description">Clear all scan records? This cannot be undone.</string>
     <string name="nav_use_wechat_icons">Use WeChat native icons</string>
+    <string name="qr_code_record_home_menu_title">Scan records</string>
 </resources>

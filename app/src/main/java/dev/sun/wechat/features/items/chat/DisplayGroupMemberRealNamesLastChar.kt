@@ -43,6 +43,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 object DisplayGroupMemberRealNamesLastChar : ClickableFeature(), IContactInfoProvider {
 
@@ -203,6 +205,32 @@ object DisplayGroupMemberRealNamesLastChar : ClickableFeature(), IContactInfoPro
                 is FetchResult.Failure, FetchResult.SaveFailure -> pendingOrQueried.remove(senderId)
             }
         }
+    }
+
+    /**
+     * Blocking variant of [fetchRealName] for call sites that must obtain the name synchronously
+     * (e.g. the group join/leave card). Returns the cached entry when present, otherwise
+     * dispatches one fetch and waits up to [timeoutMs]. Returns null when nothing is known:
+     * already queried this session, the server reported no real name, or the wait timed out.
+     *
+     * Must be called off the main thread; the CGI callback thread releases the latch.
+     */
+    fun fetchRealNameBlocking(senderId: String, groupId: String?, timeoutMs: Long): String? {
+        realNames[senderId]?.let { return it }
+        if (!pendingOrQueried.add(senderId)) return null
+
+        val latch = CountDownLatch(1)
+        val holder = arrayOfNulls<String>(1)
+        actualFetchRealName(senderId, groupId) { result ->
+            when (result) {
+                is FetchResult.Found -> holder[0] = result.realName
+                FetchResult.NoRealName -> {}
+                is FetchResult.Failure, FetchResult.SaveFailure -> pendingOrQueried.remove(senderId)
+            }
+            latch.countDown()
+        }
+        latch.await(timeoutMs, TimeUnit.MILLISECONDS)
+        return holder[0] ?: realNames[senderId]
     }
 
     // ── IContactInfoProvider ──────────────────────────────────────────────────

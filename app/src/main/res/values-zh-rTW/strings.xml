@@ -4360,4 +4360,5 @@
     <string name="structured_storage_unavailable">此功能的資料無法載入。請檢查遷移記錄並重新啟動微信重試。</string>
     <string name="system_qr_code_record_clear_description">確定清空所有掃描記錄嗎？此操作無法復原。</string>
     <string name="nav_use_wechat_icons">使用微信原生圖示</string>
+    <string name="qr_code_record_home_menu_title">掃描記錄</string>
 </resources>
