@@ -129,22 +129,31 @@ object JevProtocol {
         candidates.associate { it.id to "${it.title}；要判断：${it.question}" } + ("none" to "都不贴合或线索不足，暂不解读")
 
     private fun readChoice(answers: JSONObject, key: String, options: Map<String, String>): ChatDecision {
-        val answer = answers.getJSONObject(key)
-        require(answer.getString("type") == "choice")
-        val confidence = probability(answer, "confidence")
-        val chosen = answer.getString("choice")
-        require(chosen in options)
-        val distribution = answer.getJSONObject("probabilities")
-        require(distribution.length() == options.size)
-        val values = options.keys.associateWith { probability(distribution, it) }
-        require(abs(values.values.sum() - 1.0) <= 0.02)
-        require(values.getValue(chosen) + 0.000001 >= values.values.max())
-        return ChatDecision(chosen, values, confidence)
+        try {
+            val answer = answers.getJSONObject(key)
+            require(answer.getString("type") == "choice")
+            val confidence = probability(answer, "confidence")
+            val chosen = answer.getString("choice")
+            require(chosen in options) { "choice=$chosen 不在候选内" }
+            val distribution = answer.getJSONObject("probabilities")
+            require(distribution.length() == options.size) {
+                "概率项数 ${distribution.length()} != 候选数 ${options.size}（${distribution.keys().asSequence().toList()}）"
+            }
+            val values = options.keys.associateWith { probability(distribution, it) }
+            require(abs(values.values.sum() - 1.0) <= 0.02) { "概率和 ${values.values.sum()}" }
+            require(values.getValue(chosen) + 0.000001 >= values.values.max()) {
+                "choice=$chosen 不是最高概率项（${values.getValue(chosen)} vs ${values.values.max()}）"
+            }
+            return ChatDecision(chosen, values, confidence)
+        } catch (e: Exception) {
+            // 裸 require 抛出的 "Failed requirement." 无法定位问题，这里补上是哪个问题、错在哪。
+            throw IllegalStateException("字段 $key 解析失败：${e.message ?: e::class.simpleName}", e)
+        }
     }
 
     private fun probability(obj: JSONObject, key: String): Double {
         val raw = obj.get(key)
-        require(raw is Number)
-        return raw.toDouble().also { require(it.isFinite() && it in 0.0..1.0) }
+        require(raw is Number) { "$key 不是数字：$raw" }
+        return raw.toDouble().also { require(it.isFinite() && it in 0.0..1.0) { "$key 超出 0..1：$it" } }
     }
 }

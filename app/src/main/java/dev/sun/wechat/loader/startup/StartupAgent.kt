@@ -11,8 +11,13 @@ import dev.sun.wechat.loader.entry.zygisk.ArtHookBridge
 import dev.sun.wechat.loader.entry.zygisk.ZygiskLoaderService
 import dev.sun.wechat.loader.utils.HybridClassLoader
 import dev.sun.wechat.loader.utils.NativeLoader
+import dev.sun.wechat.data.JsonDataMigration
+import dev.sun.wechat.data.LegacyDocumentMigration
 import dev.sun.wechat.utils.HostInfo
+import dev.sun.wechat.utils.TargetProcess
+import dev.sun.wechat.utils.TargetProcesses
 import dev.sun.wechat.utils.WeLogger
+import dev.sun.wechat.utils.fs.LegacyStorageMigration
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.io.File
 import java.lang.reflect.Field
@@ -58,10 +63,22 @@ object StartupAgent {
 
         HostInfo.init(application)
         NativeLoader.init(application)
+        // 旧存储/文档/JSON 迁移都是一次性写入，只有主进程负责。
+        // 缺少这一步会让 KvStore/FeatureStore 在启动时抛「JSON migration has not completed」，
+        // 抢红包、收转账、群成员实名尾字等功能会直接启用失败。
+        if (TargetProcesses.isInMain) {
+            LegacyStorageMigration.run(application)
+            LegacyDocumentMigration.run(application)
+            JsonDataMigration.run()
+        }
         if (hookBridge is ArtHookBridge) {
             hideModuleLibraries(hookBridge)
         }
-        WeLauncher.init(application)
+        // 隔离进程没有功能模块，也不能碰共享的 Room 文件：
+        // 否则主进程还在搬旧库时，FeaturesLoader 就可能抢先初始化 DexCache/Room。
+        if (TargetProcesses.currentType != TargetProcess.ISOLATED) {
+            WeLauncher.init(application)
+        }
 
         runCatching {
             application.dataDir.toPath().resolve("app_qqprotect").deleteRecursively()
