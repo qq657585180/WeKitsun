@@ -44,7 +44,7 @@ object ReplyHttpClient {
     }
 
     private suspend fun request(endpoint: String, apiKey: String, payload: JSONObject): String =
-        suspendCancellableCoroutine { continuation ->
+        suspendCancellableCoroutine<String> { continuation ->
             val call = client.newCall(
                 Request.Builder()
                     .url(endpoint)
