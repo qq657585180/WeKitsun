@@ -60,8 +60,8 @@ object ReplyHttpClient {
                 }
                 override fun onResponse(call: Call, response: Response) {
                     if (!continuation.isActive) { response.close(); return }
-                    val result = runCatching {
-                        response.use {
+                    try {
+                        val body: String = response.use {
                             val reason = when (it.code) {
                                 401, 403 -> "API Key 或模型权限不可用，请检查模型配置"
                                 402 -> "模型账户额度不足"
@@ -74,14 +74,14 @@ object ReplyHttpClient {
                             val source = requireNotNull(it.body).source()
                             source.request(1024 * 1024L + 1)
                             check(source.buffer.size <= 1024 * 1024L) { "模型响应过长" }
-                            val body: String = source.readUtf8()
-                            body
+                            source.readUtf8()
                         }
-                    }.recoverCatching { error ->
-                        if (error is IllegalStateException) throw error
-                        throw IllegalStateException("读取回复失败，请检查网络后重试", error)
+                        continuation.resume(body)
+                    } catch (error: IllegalStateException) {
+                        continuation.resumeWithException(error)
+                    } catch (error: Exception) {
+                        continuation.resumeWithException(IllegalStateException("读取回复失败，请检查网络后重试", error))
                     }
-                    continuation.resumeWith(result)
                 }
             })
         }
