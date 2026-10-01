@@ -2,6 +2,12 @@ package dev.sun.wechat.features.items.chat_mood
 
 import dev.sun.wechat.agent.data.WeAgentRepository
 import dev.sun.wechat.data.KvStore
+import dev.sun.wechat.utils.WeLogger
+
+data class ReplySuggestion(val parts: List<String>, val reason: String) {
+    init { require(parts.size in 1..6 && parts.all { it.isNotBlank() }) }
+    val text: String get() = parts.joinToString("\n")
+}
 
 enum class ReplyRelationship(val id: String, val label: String, val guidance: String) {
     UNSPECIFIED("unspecified", "未指定", "关系未指定。只依据可见聊天调整口吻，不擅自假定恋爱、亲属关系或亲密称呼。"),
@@ -37,7 +43,7 @@ object ReplyConfig {
         val id = modelId.ifBlank { return null }
         val model = WeAgentRepository.getModel(id) ?: return null
         val provider = WeAgentRepository.getModelProvider(model.providerId) ?: return null
-        val endpoint = provider.apiBase.ifBlank { return null }
+        val endpoint = provider.baseUrl.ifBlank { return null }
         val key = provider.apiKey.ifBlank { return null }
         return Triple(endpoint, key, model.modelIdRemote)
     }
