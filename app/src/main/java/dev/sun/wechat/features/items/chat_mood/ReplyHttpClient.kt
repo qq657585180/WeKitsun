@@ -74,7 +74,8 @@ object ReplyHttpClient {
                             val source = requireNotNull(it.body).source()
                             source.request(1024 * 1024L + 1)
                             check(source.buffer.size <= 1024 * 1024L) { "模型响应过长" }
-                            source.readUtf8()
+                            val body: String = source.readUtf8()
+                            body
                         }
                     }.recoverCatching { error ->
                         if (error is IllegalStateException) throw error
