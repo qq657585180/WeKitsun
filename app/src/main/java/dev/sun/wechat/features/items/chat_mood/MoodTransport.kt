@@ -52,4 +52,29 @@ object MoodTransport {
             JevProtocol.fallback(profile)
         }
     }
+
+    /**
+     * 三段解读（意图解析 / 可能在意 / 情绪倾向）单独走 WeAgent 模型。
+     * 用户在 WeAgent 里配了模型才有这段；没配 / 失败就返回空，卡片只显示概率。
+     */
+    suspend fun readingFor(input: AnalysisInput, mood: Mood): MoodReading {
+        if (!AgentLlm.isReady()) return MoodReading.EMPTY
+        return try {
+            SmartProtocol.parse(AgentLlm.complete(SmartProtocol.prompt(input.text)))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            WeLogger.w(TAG, "intent reading failed, keeping probability-only", e)
+            MoodReading.EMPTY
+        }
+    }
+
+    /**
+     * 完整一次分析：先跑 JEV 拿情绪概率，再补一段 WeAgent 的三段解读（可选）。
+     */
+    suspend fun analyzeSmart(input: AnalysisInput, mood: Mood): Mood {
+        val reading = readingFor(input, mood)
+        if (reading.isEmpty) return mood
+        return mood.copy(reading = reading)
+    }
 }

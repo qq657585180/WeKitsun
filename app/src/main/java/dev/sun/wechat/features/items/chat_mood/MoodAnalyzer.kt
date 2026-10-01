@@ -54,7 +54,8 @@ object MoodAnalyzer {
             try {
                 slots.withPermit {
                     val visible = stillVisible ?: { true }
-                    val mood = MoodTransport.analyze(input) { visible() }
+                    val base = MoodTransport.analyze(input) { visible() }
+                    val mood = MoodTransport.analyzeSmart(input, base)
                     MoodStore.complete(key, mood)
                     failures.remove(key); failureMessages.remove(key)
                     refresh()
@@ -75,7 +76,8 @@ object MoodAnalyzer {
     /** 手动/面板触发：直接同步分析并返回结果（不计入 MoodStore 去重）。 */
     suspend fun requestMood(text: String, context: List<ContextMessage> = emptyList(), speaker: String = "对方"): Mood =
         try {
-            MoodTransport.analyze(AnalysisInput(text, "manual", context, speaker = speaker))
+            val input = AnalysisInput(text, "manual", context, speaker = speaker)
+            MoodTransport.analyzeSmart(input, MoodTransport.analyze(input))
         } catch (e: Exception) {
             Mood("分析失败", 0.0, 1, "", e.message ?: "未知错误")
         }

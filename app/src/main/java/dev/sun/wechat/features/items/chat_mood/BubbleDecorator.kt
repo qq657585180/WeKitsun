@@ -46,7 +46,11 @@ object BubbleDecorator {
 
     /** 卡片文案：结果 → 失败 → 未分析/进行中。 */
     private fun cardText(key: String): String {
-        MoodStore.get(key)?.detail?.let { return it }
+        MoodStore.get(key)?.let { mood ->
+            val base = mood.detail.ifBlank { mood.label }
+            val reading = SmartProtocol.render(mood.reading)
+            return if (reading.isBlank()) base else base + "\n" + reading
+        }
         MoodAnalyzer.failure(key)?.let { return "${MoodAnalyzer.header}\n分析失败：$it\n点击此卡重试" }
         if (!MoodAnalyzer.enabled) return "${MoodAnalyzer.header}\n模型未配置"
         // 只对真正提交过的消息显示「正在分析」，其余提示尚未分析，避免永久转圈。
