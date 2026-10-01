@@ -43,15 +43,15 @@ object ReplyHttpClient {
         ReplyProtocol.parseTopics(body)
     }
 
-    private suspend fun request(endpoint: String, apiKey: String, payload: JSONObject): String =
-        suspendCancellableCoroutine<String> { continuation ->
-            val call = client.newCall(
-                Request.Builder()
-                    .url(endpoint)
-                    .header("Authorization", "Bearer $apiKey")
-                    .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
-                    .build()
-            )
+    private suspend fun request(endpoint: String, apiKey: String, payload: JSONObject): String {
+        val call = client.newCall(
+            Request.Builder()
+                .url(endpoint)
+                .header("Authorization", "Bearer $apiKey")
+                .post(payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType()))
+                .build()
+        )
+        return suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
@@ -59,6 +59,7 @@ object ReplyHttpClient {
                         continuation.resumeWithException(IllegalStateException("连接超时或网络不可用，请重试"))
                 }
                 override fun onResponse(call: Call, response: Response) {
+                    if (!continuation.isActive) { response.close(); return }
                     val result = runCatching {
                         response.use {
                             val reason = when (it.code) {
@@ -73,15 +74,15 @@ object ReplyHttpClient {
                             val source = requireNotNull(it.body).source()
                             source.request(1024 * 1024L + 1)
                             check(source.buffer.size <= 1024 * 1024L) { "模型响应过长" }
-                            @Suppress("UNCHECKED_CAST")
                             source.readUtf8()
                         }
                     }.recoverCatching { error ->
                         if (error is IllegalStateException) throw error
                         throw IllegalStateException("读取回复失败，请检查网络后重试", error)
                     }
-                    if (continuation.isActive) continuation.resumeWith(result)
+                    continuation.resumeWith(result)
                 }
             })
         }
+    }
 }
