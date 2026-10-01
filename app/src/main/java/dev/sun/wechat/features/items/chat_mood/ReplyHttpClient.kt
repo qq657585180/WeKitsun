@@ -11,6 +11,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 /**
@@ -60,25 +61,31 @@ object ReplyHttpClient {
                 }
                 override fun onResponse(call: Call, response: Response) {
                     if (!continuation.isActive) { response.close(); return }
-                    val body: String = response.use {
-                            val reason = when (it.code) {
+                    try {
+                        val body: String = response.use { resp ->
+                            val reason = when (resp.code) {
                                 401, 403 -> "API Key 或模型权限不可用，请检查模型配置"
                                 402 -> "模型账户额度不足"
                                 429 -> "请求过于频繁，请稍后重试"
                                 400, 404, 422 -> "接口地址或模型不支持，请检查配置"
                                 in 300..399 -> "接口发生重定向，请填写最终地址"
-                                else -> if (it.isSuccessful) null else "模型服务暂不可用（HTTP ${it.code}）"
+                                else -> if (resp.isSuccessful) null else "模型服务暂不可用（HTTP ${resp.code}）"
                             }
                             check(reason == null) { reason ?: "unknown" }
-                            val source = requireNotNull(it.body).source()
+                            val source = requireNotNull(resp.body).source()
                             source.request(1024 * 1024L + 1)
                             check(source.buffer.size <= 1024 * 1024L) { "模型响应过长" }
-                            val body: String = source.readUtf8()
-                            continuation.resume(body)
+                            source.readUtf8()
+                        }
+                        continuation.resume(body)
                     } catch (error: IllegalStateException) {
-                        continuation.resumeWithException(error)
+                        if (continuation.isActive) continuation.resumeWithException(error)
                     } catch (error: Exception) {
-                        continuation.resumeWithException(IllegalStateException("读取回复失败，请检查网络后重试", error))
+                        if (continuation.isActive) {
+                            continuation.resumeWithException(
+                                IllegalStateException("读取回复失败，请检查网络后重试", error)
+                            )
+                        }
                     }
                 }
             })
