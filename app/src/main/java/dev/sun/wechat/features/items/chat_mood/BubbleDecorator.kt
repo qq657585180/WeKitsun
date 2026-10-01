@@ -17,14 +17,18 @@ import java.util.IdentityHashMap
 object BubbleDecorator {
     private val TAG_D = "BubbleDecorator"
     private data class Card(
-        val key: String, val view: TextView, val parent: ViewGroup,
-        val anchor: View, val assignedId: Int?, val detach: View.OnAttachStateChangeListener,
+        val key: String, val view: TextView, val parent: ViewGroup, val row: View,
+        val anchor: View, val assignedId: Int?, val input: AnalysisInput,
+        val detach: View.OnAttachStateChangeListener,
     )
     private val cards = IdentityHashMap<View, Card>()
     private val unsupported = mutableSetOf<String>()
+    private val refreshRegistered = java.util.concurrent.atomic.AtomicBoolean(false)
 
     fun show(row: View, message: AnalysisInput?): Boolean {
         if (message == null || !MoodAnalyzer.enabled || !MoodAnalyzer.showBadge) { clear(row); return false }
+        // 首次绘制时挂上完成回调，之后结果落地就能直接改这张卡的文字。
+        if (refreshRegistered.compareAndSet(false, true)) MoodAnalyzer.onRefresh(::refreshAll)
         val key = message.key
         var state = cards[row]
         if (state != null && (state.key != key || state.view.parent !== state.parent)) {
@@ -32,17 +36,43 @@ object BubbleDecorator {
             state = null
         }
         if (state == null) {
-            state = attach(row, key) ?: return false
+            state = attach(row, key, message) ?: return false
             cards[row] = state
         }
-        val value = MoodStore.get(key)?.detail ?: MoodAnalyzer.failure(key)?.let {
-            "${MoodAnalyzer.header}\n分析失败：$it\n点击此卡重试"
-        } ?: "${MoodAnalyzer.header}\n" + if (MoodAnalyzer.enabled) "正在分析…" else "模型未配置"
+        val value = cardText(key)
         if (state.view.text.toString() != value) state.view.text = value
         return true
     }
 
-    private fun attach(row: View, key: String): Card? {
+    /** 卡片文案：结果 → 失败 → 未分析/进行中。 */
+    private fun cardText(key: String): String {
+        MoodStore.get(key)?.detail?.let { return it }
+        MoodAnalyzer.failure(key)?.let { return "${MoodAnalyzer.header}\n分析失败：$it\n点击此卡重试" }
+        if (!MoodAnalyzer.enabled) return "${MoodAnalyzer.header}\n模型未配置"
+        // 只对真正提交过的消息显示「正在分析」，其余提示尚未分析，避免永久转圈。
+        return if (MoodStore.isPending(key)) "${MoodAnalyzer.header}\n正在分析…"
+        else "${MoodAnalyzer.header}\n点击此卡分析"
+    }
+
+    /**
+     * 分析完成/失败后由 MoodAnalyzer 回调触发：就地刷新所有已挂载卡片。
+     * 不重新 onMessageViewAttached，所以不会再提交一次分析。
+     */
+    private fun refreshAll() {
+        cards.entries.toList().forEach { (row, state) ->
+            if (!row.isAttachedToWindow) { clear(row); return@forEach }
+            updateCard(state.key)
+        }
+    }
+
+    /** 卡片当前文案与状态不符时才写回，避免无谓重绘。 */
+    private fun updateCard(key: String) {
+        val state = cards.values.firstOrNull { it.key == key } ?: return
+        val text = cardText(key)
+        if (state.view.text.toString() != text) state.view.text = text
+    }
+
+    private fun attach(row: View, key: String, input: AnalysisInput): Card? {
         val root = row as? ViewGroup ?: return null
         val anchor = findBubble(root) ?: return null
         val rowPos = IntArray(2).also { root.getLocationOnScreen(it) }
@@ -62,10 +92,10 @@ object BubbleDecorator {
             }
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
             setOnClickListener {
-                if (MoodAnalyzer.failure(key) != null) {
-                    MoodAnalyzer.retryFailure(key)
-                    MoodAnalyzer.refresh()
-                }
+                // 失败或从未分析：点一下重新提交（键稳定，不会因为点击产生重复缓存条目）
+                MoodAnalyzer.retryFailure(key)
+                MoodAnalyzer.submit(input) { isAttachedToWindow }
+                updateCard(key)
             }
         }
         var branch: View = anchor
@@ -117,7 +147,7 @@ object BubbleDecorator {
             override fun onViewDetachedFromWindow(v: View) { clear(v) }
         }
         row.addOnAttachStateChangeListener(detach)
-        return Card(key, card, target, branch, assignedId, detach)
+        return Card(key, card, target, row, branch, assignedId, input, detach)
     }
 
     private fun findBubble(root: ViewGroup): View? {
@@ -153,7 +183,7 @@ object BubbleDecorator {
         (state.view.parent as? ViewGroup)?.removeView(state.view)
         if (state.assignedId != null && state.anchor.id == state.assignedId) state.anchor.id = View.NO_ID
     }
-    fun clearAll() { cards.keys.toList().forEach(::clear) }
+    fun clearAll() { cards.keys.toList().forEach(::clear); refreshRegistered.set(false) }
     fun prune() { cards.keys.filter { !it.isAttachedToWindow }.forEach(::clear) }
     private fun dp(view: View, n: Int) = (n * view.resources.displayMetrics.density).toInt()
 }

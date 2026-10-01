@@ -39,13 +39,19 @@ object MoodStore {
             field(messageId.toString())
             field(speaker)
             field(text)
-            context.forEach { field(it.speaker); field(it.text) }
+            // 上下文只在没有消息身份时参与键（面板/手动触发）。
+            // 聊天消息用 talker + createTime 已能唯一定位，再混入上下文会让每次列表重绑定
+            // 都算出新键 → 卡片永远读不到结果停在「正在分析」，且每条消息被反复提交模型。
+            if (messageId == 0L) context.forEach { field(it.speaker); field(it.text) }
         }
         return java.security.MessageDigest.getInstance("SHA-256")
             .digest(source.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
     }
 
     fun get(key: String): Mood? = cache[key]
+
+    /** 是否已认领但还没结果：界面据此区分「正在分析」和「从未分析」。 */
+    fun isPending(key: String): Boolean = pending.contains(key)
 
     /** 尝试认领一次分析任务；已经在跑或已完成返回 false。 */
     fun claim(key: String): Boolean {
