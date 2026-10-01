@@ -60,8 +60,7 @@ object ReplyHttpClient {
                 }
                 override fun onResponse(call: Call, response: Response) {
                     if (!continuation.isActive) { response.close(); return }
-                    try {
-                        val body: String = response.use {
+                    val body: String = response.use {
                             val reason = when (it.code) {
                                 401, 403 -> "API Key 或模型权限不可用，请检查模型配置"
                                 402 -> "模型账户额度不足"
@@ -70,7 +69,7 @@ object ReplyHttpClient {
                                 in 300..399 -> "接口发生重定向，请填写最终地址"
                                 else -> if (it.isSuccessful) null else "模型服务暂不可用（HTTP ${it.code}）"
                             }
-                            check(reason == null) { reason }
+                            check(reason == null) { reason ?: "unknown" }
                             val source = requireNotNull(it.body).source()
                             source.request(1024 * 1024L + 1)
                             check(source.buffer.size <= 1024 * 1024L) { "模型响应过长" }
