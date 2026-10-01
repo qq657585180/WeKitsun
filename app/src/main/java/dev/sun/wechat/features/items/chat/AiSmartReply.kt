@@ -31,7 +31,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.composables.icons.materialsymbols.MaterialSymbols
-import com.composables.icons.materialsymbols.outlined.Auto_awesome
 import dev.sun.wechat.R
 import dev.sun.wechat.agent.data.WeAgentRepository
 import dev.sun.wechat.agent.model.LlmMessage
@@ -41,10 +40,7 @@ import dev.sun.wechat.agent.model.ModelProviderManager
 import dev.sun.wechat.features.api.core.WeDatabaseApi
 import dev.sun.wechat.features.api.core.WeMessageApi
 import dev.sun.wechat.features.api.core.models.MessageInfo
-import dev.sun.wechat.features.api.ui.WeChatMessageContextMenuApi
-import dev.sun.wechat.features.api.ui.WeChatMessageContextMenuApi.MenuItem
-import dev.sun.wechat.features.core.ClickableFeature
-import dev.sun.wechat.features.core.FeatureCategoryIds
+import dev.sun.wechat.features.items.chat_mood.ReplyConfig
 import dev.sun.wechat.data.KvStore
 import dev.sun.wechat.data.KvStore.prefOption
 import dev.sun.wechat.ui.content.AlertDialogContent
@@ -61,20 +57,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * 长按智能回复（移植自 FkWeChat"AI回复"）：
- * 快捷选择语气预设 → 按预设生成多条可编辑的回复候选 → 发送。
- *  - 语气预设：10 种（智能全能/高情商/轻松闲聊/严谨正式/幽默阴阳/同理安慰/客气周到/霸道冷酷/可爱萌化/委婉拒绝）
- *  - 参考上下文条数（默认10，取该会话最近N条）
- *  - 生成备选数（默认20）
- *  AI 调用复用 WeAgent 模型库。
+ * 帮我回（原「智能回复」，并入情绪分析）：
+ * 快捷选择语气/关系预设 → 按预设生成多条可编辑的回复候选 → 发送。
+ *  - 语气预设：智能全能/高情商/…/委婉拒绝
+ *  - 关系预设：亲人/朋友/同事/恋人/长辈/弟弟妹妹/暗恋对象/暧昧对象
+ *  - 参考上下文条数（默认10，取该会话最近N条）；生成备选数（默认20）
+ *  AI 调用复用 WeAgent 模型库。不再作为独立开关，由情绪分析 UI 直接打开。
  */
-object AiSmartReply : ClickableFeature(),
-    WeChatMessageContextMenuApi.IMenuItemsProvider {
-
-    override val technicalId = "智能回复"
-    override val nameRes = R.string.feature_ai_smart_reply_name
-    override val categoryIds = listOf(FeatureCategoryIds.CHAT)
-    override val descriptionRes = R.string.feature_ai_smart_reply_description
+object AiSmartReply {
 
     private const val TAG = "AiSmartReply"
 
@@ -86,12 +76,10 @@ object AiSmartReply : ClickableFeature(),
             stylePromptKey(name),
             STYLES.firstOrNull { it.first == name }?.second ?: "",
         )
-    private const val MENU_ID = 777042
-
     var contextLimit by prefOption("ai_reply_context_limit", 10)
     var replyCount by prefOption("ai_reply_count", 20)
 
-    /** 语气预设 name -> prompt（与 FkWeChat 一致） */
+    /** 语气预设 name -> prompt（与 FkWeChat 一致，含关系预设） */
     val STYLES = listOf(
         "智能全能" to "分析当前对话氛围，给出最得体、自然的回复。",
         "高情商" to "说话非常有艺术，能够化解尴尬，照顾对方感受，充满智慧。",
@@ -103,30 +91,15 @@ object AiSmartReply : ClickableFeature(),
         "霸道/冷酷" to "言简意赅，语气带有一点压迫感和冷酷的霸总风格。",
         "可爱/萌化" to "说话活泼，多用呀、哒、呢，增加适量颜文字，非常可爱。",
         "委婉拒绝" to "礼貌地拒绝对方的要求，不让对方感到难堪，语气委婉。",
-    )
-
-    override fun onEnable() {
-        WeChatMessageContextMenuApi.addProvider(this)
-    }
-
-    override fun onDisable() {
-        WeChatMessageContextMenuApi.removeProvider(this)
-    }
-
-    override fun onClick(context: ComponentActivity) {
-        showComposeDialog(context) { SettingsDialogContent(context) }
-    }
-
-    override fun getMenuItems(): List<MenuItem> = listOf(
-        MenuItem(
-            id = MENU_ID,
-            text = "智能回复",
-            drawable = AiSmartReplyIcon,
-            imageVector = MaterialSymbols.Outlined.Auto_awesome,
-            isSupported = { msg -> msg.type?.isText == true },
-        ) { view, ctx, msgInfo ->
-            showSmartReplyDialog(ctx.activity, msgInfo)
-        },
+        // ===== 关系预设（帮我回按对方身份调整语气）=====
+        "亲人" to "对方是亲人。语气温暖、直接、日常化，关心具体事情，亲近而不客套。",
+        "朋友" to "对方是朋友。自然平等、接住话题，语气轻松，熟悉程度以聊天为准。",
+        "同事" to "对方是同事。友好、清楚、简洁，就事论事，边界明确。",
+        "恋人" to "对方是恋人。可亲近、简短、有生活感，称呼和撒娇程度沿用实际聊天。",
+        "长辈" to "对方是长辈。尊重、清楚、亲切，用词礼貌，称呼依据聊天。",
+        "弟弟妹妹" to "对方是弟弟妹妹。亲近平等、关心具体事情，不居高临下。",
+        "暗恋对象" to "对方是我暗恋的人，不代表对方也喜欢我。自然表达关注，轻松而有分寸，不默认暧昧。",
+        "暧昧对象" to "以轻松、有来有往的口吻交流，调侃需结合对方实际回应。",
     )
 
     @Composable
@@ -180,13 +153,20 @@ object AiSmartReply : ClickableFeature(),
 
     private fun showSmartReplyDialog(activity: Activity, msgInfo: MessageInfo) {
         showComposeDialog(activity) {
-            SmartReplyDialogContent(msgInfo)
+            SmartReplyDialogContent(msgInfo.talker, msgMessageText(msgInfo))
+        }
+    }
+
+    /** 从聊天输入栏（+ 面板）打开智能回复：针对当前会话生成，未选中具体消息。 */
+    fun openSmartReply(activity: Activity, talker: String) {
+        showComposeDialog(activity) {
+            SmartReplyDialogContent(talker, "")
         }
     }
 
     @Composable
     @OptIn(ExperimentalLayoutApi::class)
-    private fun ShowComposeDialogScope.SmartReplyDialogContent(msgInfo: MessageInfo) {
+    private fun ShowComposeDialogScope.SmartReplyDialogContent(talker: String, text: String) {
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
         var selectedStyle by remember { mutableStateOf("智能全能") }
@@ -194,8 +174,6 @@ object AiSmartReply : ClickableFeature(),
         var candidates by remember { mutableStateOf<List<String>>(emptyList()) }
         var loading by remember { mutableStateOf(false) }
         var error by remember { mutableStateOf<String?>(null) }
-
-        val text = remember(msgInfo.id) { msgMessageText(msgInfo) }
 
         fun generate() {
             if (loading) return
@@ -206,7 +184,7 @@ object AiSmartReply : ClickableFeature(),
                 KvStore.putString(stylePromptKey(selectedStyle), stylePromptInput.trim())
                 // 换一批: 先清空旧候选, 生成中显示思考态
                 candidates = emptyList()
-                candidates = generateCandidates(msgInfo.talker, text, selectedStyle, stylePromptInput.trim())
+                candidates = generateCandidates(talker, text, selectedStyle, stylePromptInput.trim())
                 loading = false
                 if (candidates.isEmpty()) error = "生成失败，请检查模型配置"
             }
@@ -259,7 +237,7 @@ object AiSmartReply : ClickableFeature(),
                                     onClick = {
                                         val finalText = editable.trim()
                                         if (finalText.isEmpty()) { showToast(context, context.getString(R.string.ama_tts_empty_v2)); return@Button }
-                                        val ok = WeMessageApi.sendText(msgInfo.talker, finalText)
+                                        val ok = WeMessageApi.sendText(talker, finalText)
                                         showToast(context, context.getString(if (ok) R.string.ama_sent else R.string.ama_send_failed))
                                     },
                                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
@@ -309,7 +287,10 @@ object AiSmartReply : ClickableFeature(),
     private suspend fun generateCandidates(talker: String, content: String, styleName: String, promptOverride: String? = null): List<String> =
         withContext(Dispatchers.IO) {
             try {
-                val modelId = WeAgentRepository.firstModelId() ?: return@withContext emptyList()
+                // 优先用情绪分析 UI 里选的回复模型；未选或已删时回退 WeAgent 默认模型
+                val modelId = ReplyConfig.modelId.takeIf { it.isNotBlank() && WeAgentRepository.getModel(it) != null }
+                    ?: WeAgentRepository.firstModelId()
+                    ?: return@withContext emptyList()
                 val model = WeAgentRepository.getModel(modelId) ?: return@withContext emptyList()
                 val provider = WeAgentRepository.getModelProvider(model.providerId) ?: return@withContext emptyList()
                 val client = ModelProviderManager.clientFor(provider)

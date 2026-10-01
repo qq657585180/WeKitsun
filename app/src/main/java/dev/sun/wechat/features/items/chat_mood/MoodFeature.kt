@@ -1,6 +1,7 @@
 package dev.sun.wechat.features.items.chat_mood
 
 import androidx.activity.ComponentActivity
+import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,10 +21,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.composables.icons.materialsymbols.MaterialSymbols
+import com.tencent.mm.pluginsdk.ui.chat.ChatFooter
 import dev.sun.wechat.agent.data.WeAgentRepository
 import dev.sun.wechat.R
 import dev.sun.wechat.features.core.ClickableFeature
 import dev.sun.wechat.features.core.FeatureCategoryIds
+import dev.sun.wechat.features.api.ui.WeChatInputBarMenuApi
+import dev.sun.wechat.features.api.ui.WeCurrentConversationApi
+import dev.sun.wechat.features.items.chat.AiSmartReply
 import dev.sun.wechat.ui.content.AlertDialogContent
 import dev.sun.wechat.ui.content.m3.DropdownOption
 import dev.sun.wechat.ui.content.m3.DropDownMenuWidget
@@ -63,7 +69,7 @@ object MoodFeature : ClickableFeature() {
             var jevEndpoint by remember { mutableStateOf(MoodTransport.jevEndpoint) }
             var jevModel by remember { mutableStateOf(MoodTransport.jevModel) }
 
-            // 回复模型：从 WeAgent 已配模型中选择
+            // 回复模型：从 WeAgent 已配模型中选择（帮我回直接用它）
             var replyModelId by remember { mutableStateOf(ReplyConfig.modelId) }
             val models by remember { WeAgentRepository.observeModels() }
                 .collectAsState(initial = emptyList())
@@ -121,23 +127,31 @@ object MoodFeature : ClickableFeature() {
 
                         HorizontalDivider()
 
-                        // ===== 回复模型 =====
+                        // ===== 帮我回 · 找话题 =====
                         Text("帮我回 · 找话题", style = MaterialTheme.typography.titleSmall)
                         Text("回复和话题生成使用 WeAgent 已配置的聊天模型", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (models.isNotEmpty()) {
                             val replyOpts = listOf(DropdownOption("", "（未选择）")) +
                                 models.map { DropdownOption(it.id, "${it.displayName.ifBlank { it.modelIdRemote }} (${it.providerId})") }
-                            val selectedLabel = replyOpts.firstOrNull { it.value == replyModelId }?.label ?: "（未选择）"
+                            // 存的 modelId 已被删除时回退（未选择），避免 DropDownMenuWidget first{} 崩溃
+                            val effectiveId = if (replyOpts.any { it.value == replyModelId }) replyModelId else ""
+                            if (effectiveId != replyModelId) replyModelId = effectiveId
+                            val selectedLabel = replyOpts.firstOrNull { it.value == effectiveId }?.label ?: "（未选择）"
                             DropDownMenuWidget(
                                 title = "回复模型",
                                 description = selectedLabel,
-                                value = replyModelId,
+                                value = effectiveId,
                                 options = replyOpts,
                                 enabled = true,
                                 onValueChange = { replyModelId = it },
                             )
                         } else {
                             Text("暂无已配置的模型，请先在 WeAgent 设置中添加", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        }
+                        TextButton(onClick = {
+                            AiSmartReply.openSmartReply(context, WeCurrentConversationApi.value)
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text("打开帮我回")
                         }
                     }
                 },

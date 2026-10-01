@@ -4235,7 +4235,7 @@
     <string name="asr_thinking">AI 思考中…</string>
     <string name="asr_style_prompt_label">风格提示词（可直接修改）</string>
 
-    <string name="feature_ai_smart_reply_name">智能回复</string>
+    <string name="feature_ai_smart_reply_name">帮我回</string>
     <string name="feature_ai_smart_reply_description">长按消息，生成可编辑的 AI 回复候选并发送</string>
     <string name="ama_send">发送</string>
     <string name="ama_sent">已发送</string>

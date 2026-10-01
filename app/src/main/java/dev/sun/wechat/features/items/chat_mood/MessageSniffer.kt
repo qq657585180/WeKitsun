@@ -42,8 +42,6 @@ object MessageSniffer {
                 )
                 MoodAnalyzer.submit(input) { view.isShown }
                 BubbleDecorator.show(view, input)
-                // 确保聊天页右上角「绘制」开关已注入
-                viewActivity(view)?.let { ChatMoodHostUi.show(it, MoodAnalyzer.header) }
             } catch (t: Throwable) {
                 WeLogger.e(TAG, "onMessageViewAttached failed", t)
             }

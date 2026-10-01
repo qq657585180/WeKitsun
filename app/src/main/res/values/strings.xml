@@ -4207,7 +4207,7 @@
     <string name="asr_thinking">AI thinking…</string>
     <string name="asr_style_prompt_label">Style prompt (editable)</string>
 
-    <string name="feature_ai_smart_reply_name">Smart reply</string>
+    <string name="feature_ai_smart_reply_name">帮我回</string>
     <string name="feature_ai_smart_reply_description">Long-press a message to generate editable AI reply candidates and send one</string>
     <string name="ama_send">Send</string>
     <string name="ama_sent">Sent</string>
