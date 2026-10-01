@@ -73,6 +73,7 @@ object ReplyHttpClient {
                             val source = requireNotNull(it.body).source()
                             source.request(1024 * 1024L + 1)
                             check(source.buffer.size <= 1024 * 1024L) { "模型响应过长" }
+                            @Suppress("UNCHECKED_CAST")
                             source.readUtf8()
                         }
                     }.recoverCatching { error ->
