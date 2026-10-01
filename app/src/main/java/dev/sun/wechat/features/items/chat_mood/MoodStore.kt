@@ -14,7 +14,24 @@ data class Mood(
     val risk: Int,
     val raw: String,
     val detail: String = label,
+    /** 「智能分析」得到的自然语言解读；模型没配或没跑时为空。 */
+    val reading: MoodReading = MoodReading.EMPTY,
 )
+
+/**
+ * 情绪之外的言外之意，对应官方卡片的「意图解析 / 可能在意 / 情绪倾向」三段。
+ * 全部为自由文本，解析失败时整块留空，卡片退回只显示概率。
+ */
+data class MoodReading(
+    val intent: String = "",
+    val concern: String = "",
+    val tone: String = "",
+    val confidence: Double = 0.0,
+) {
+    val isEmpty: Boolean get() = intent.isBlank() && concern.isBlank() && tone.isBlank()
+
+    companion object { val EMPTY = MoodReading() }
+}
 
 /**
  * 分析结果缓存。
