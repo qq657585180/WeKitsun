@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,23 +62,41 @@ object MoodFeature : ClickableFeature() {
             var jevEndpoint by remember { mutableStateOf(MoodTransport.jevEndpoint) }
             var jevModel by remember { mutableStateOf(MoodTransport.jevModel) }
 
+            // 回复模型：从 WeAgent 已配模型中选择
+            var replyModelId by remember { mutableStateOf(ReplyConfig.modelId) }
+            val models by remember { WeAgentRepository.observeModels() }
+                .collectAsState(initial = emptyList())
+
             AlertDialogContent(
-                title = { Text(stringResource(R.string.mood_feature_name)) },
+                title = { Text("言外 · 情绪分析 & 帮我回") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        // ===== Jev 情绪分析 =====
+                        Text("情绪分析（Jev）", style = MaterialTheme.typography.titleSmall)
                         val jevOpts = JevProvider.entries.map { DropdownOption(it.id, it.label) }
                         DropDownMenuWidget(
-                            title = "Jev 渠道",
+                            title = "渠道",
                             description = JevProvider.entries.firstOrNull { it.id == jevProvider }?.label ?: jevProvider,
                             value = jevProvider,
                             options = jevOpts,
                             enabled = true,
                             onValueChange = { jevProvider = it },
                         )
+                        // 显示当前渠道的官网注册链接
+                        val currentProvider = JevProvider.entries.firstOrNull { it.id == jevProvider }
+                        if (currentProvider != null && currentProvider.website.isNotBlank()) {
+                            val url = currentProvider.website
+                            TextButton(onClick = {
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                context.startActivity(intent)
+                            }) {
+                                Text("👉 去 ${currentProvider.label} 注册获取 API Key", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
                         OutlinedTextField(
                             value = jevKey,
                             onValueChange = { jevKey = it },
-                            label = { Text("Jev API Key") },
+                            label = { Text("API Key") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
                         )
@@ -96,11 +116,27 @@ object MoodFeature : ClickableFeature() {
                                 singleLine = true,
                             )
                         }
+                        Row2("显示情绪卡", showBadge) { showBadge = it }
 
                         HorizontalDivider()
 
-                        Column {
-                            Row2("显示情绪卡", showBadge) { showBadge = it }
+                        // ===== 回复模型 =====
+                        Text("帮我回 · 找话题", style = MaterialTheme.typography.titleSmall)
+                        Text("回复和话题生成使用 WeAgent 已配置的聊天模型", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (models.isNotEmpty()) {
+                            val replyOpts = listOf(DropdownOption("", "（未选择）")) +
+                                models.map { DropdownOption(it.id, "${it.displayName.ifBlank { it.modelIdRemote }} (${it.providerId})") }
+                            val selectedLabel = replyOpts.firstOrNull { it.value == replyModelId }?.label ?: "（未选择）"
+                            DropDownMenuWidget(
+                                title = "回复模型",
+                                description = selectedLabel,
+                                value = replyModelId,
+                                options = replyOpts,
+                                enabled = true,
+                                onValueChange = { replyModelId = it },
+                            )
+                        } else {
+                            Text("暂无已配置的模型，请先在 WeAgent 设置中添加", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                         }
                     }
                 },
@@ -111,6 +147,7 @@ object MoodFeature : ClickableFeature() {
                         MoodTransport.jevEndpoint = jevEndpoint.trim()
                         MoodTransport.jevModel = jevModel.trim()
                         MoodAnalyzer.showBadge = showBadge
+                        ReplyConfig.modelId = replyModelId
                         onDismiss()
                     }) { Text(stringResource(R.string.dialog_confirm)) }
                 },
