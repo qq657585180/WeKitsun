@@ -125,6 +125,7 @@ object BeautifyConversationList : ClickableFeature() {
     private val globalCardDrawables = WeakHashMap<View, GlobalCardDrawable>()
     private val globalChattingCache = WeakHashMap<View, Boolean>()
     private val globalListCache = WeakHashMap<View, Boolean>()
+    private val globalPendingLists = WeakHashMap<ViewGroup, Boolean>()
 
     /** lexin 风格自绘卡片：颜色/圆角在创建时烘焙好，滚动时零测量 */
     private class GlobalCardDrawable(
@@ -831,6 +832,25 @@ object BeautifyConversationList : ClickableFeature() {
         globalCardDrawables.clear()
         globalChattingCache.clear()
         globalListCache.clear()
+        globalPendingLists.clear()
+    }
+
+    /**
+     * 将滚动触发的样式刷新延迟到下一帧，并对同一列表去重。
+     * onScrollChanged 发生在 ViewGroup 遍历/绘制过程中，不能同步修改子 View 的
+     * layoutParams、margin 或 background，否则可能破坏 dispatchDraw 的子项快照。
+     */
+    private fun scheduleGlobalCards(list: ViewGroup) {
+        if (globalPendingLists.put(list, true) == true) return
+        list.post {
+            globalPendingLists.remove(list)
+            if (!globalCardsEnabled || !list.isAttachedToWindow) return@post
+            try {
+                applyGlobalCards(list)
+            } catch (ignored: Throwable) {
+                // 仅外观
+            }
+        }
     }
 
     /** 立即对当前可见 Activity 应用全局卡片（开关切换时调用） */
@@ -879,7 +899,7 @@ object BeautifyConversationList : ClickableFeature() {
                 val self = thisObject as? View ?: return@hookAfter
                 if (self !is ViewGroup) return@hookAfter
                 if (!isGenericList(self)) return@hookAfter
-                applyGlobalCards(self)
+                scheduleGlobalCards(self)
             }
         }
     }

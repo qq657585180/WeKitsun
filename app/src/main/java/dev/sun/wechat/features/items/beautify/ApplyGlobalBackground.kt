@@ -36,6 +36,7 @@ import com.composables.icons.materialsymbols.outlined.Opacity
 import androidx.core.view.isVisible
 import androidx.core.view.postDelayed
 import coil3.load
+import coil3.request.CachePolicy
 import coil3.request.crossfade
 import dev.ujhhgtg.reflekt.reflekt
 import dev.sun.wechat.R
@@ -109,6 +110,7 @@ object ApplyGlobalBackground : ClickableFeature(), IResolveDex {
 
     private const val OVERLAY_TAG = "wekit_global_bg_overlay"
     private const val APPLIED_URI_TAG_KEY = 0x55020001
+    private var backgroundRevision = 0L
     private const val APPLY_STATUS_BAR_DELAY_MS = 80L
 
     private val rowStates = WeakHashMap<View, RowState>()
@@ -450,9 +452,12 @@ object ApplyGlobalBackground : ClickableFeature(), IResolveDex {
         overlay.alpha = opacity
         overlay.bringToFront()
 
-        if (overlay.getTag(APPLIED_URI_TAG_KEY) != uri) {
-            overlay.setTag(APPLIED_URI_TAG_KEY, uri)
-            overlay.load(uri) {
+        val imageKey = "$uri#$backgroundRevision"
+        if (overlay.getTag(APPLIED_URI_TAG_KEY) != imageKey) {
+            overlay.setTag(APPLIED_URI_TAG_KEY, imageKey)
+            overlay.load(backgroundImageFile.toFile()) {
+                memoryCachePolicy(CachePolicy.DISABLED)
+                diskCachePolicy(CachePolicy.DISABLED)
                 crossfade(true)
             }
         }
@@ -564,7 +569,9 @@ object ApplyGlobalBackground : ClickableFeature(), IResolveDex {
                 }.isSuccess
 
                 if (ok) {
+                    backgroundRevision++
                     backgroundUri = backgroundImageFile.asAndroidUri.toString()
+                    applyBackgroundToActiveActivities()
                     showToast(context.localizedBeautifyString(R.string.beautify_global_background_selected))
                 } else {
                     showToast(context.localizedBeautifyString(R.string.beautify_global_background_import_failed))
